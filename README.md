@@ -1,5 +1,7 @@
 # Adaptive CP/W′ Cycling Training Platform
 
+<img width="1254" height="1254" alt="Vector Training" src="https://github.com/user-attachments/assets/4d1683f3-aadb-4064-9939-29a580cbab67" />
+
 A cross-platform cycling training app that builds an evolving physiological model of each rider using **Critical Power (CP), W′, power-duration data, and estimated VO₂max**.
 
 Instead of prescribing workouts from a single FTP value, the app identifies **what is currently limiting the rider**, selects an appropriate training stimulus, and generates workouts around the athlete's actual power profile.

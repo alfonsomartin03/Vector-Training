@@ -7,6 +7,7 @@ import {
     View,
 } from "react-native";
 
+import { router } from "expo-router";
 import { theme } from "../constants/theme";
 
 export default function DashboardPage() {
@@ -27,7 +28,9 @@ export default function DashboardPage() {
         >
           {/* HEADER */}
           <View style={styles.header}>
+            <Pressable onPress={() => router.push("/")}>
             <Text style={styles.logo}>VECTOR</Text>
+            </Pressable>
 
             <View style={styles.profileCircle}>
               <Text style={styles.profileInitial}>A</Text>
@@ -312,32 +315,9 @@ export default function DashboardPage() {
         </View>
       </ScrollView>
 
-      {/* FLOATING NAVIGATION */}
-      <View style={styles.navWrapper}>
-        <View style={styles.nav}>
-          <NavItem
-            symbol="⌂"
-            label="Home"
-            active
-          />
-
-          <NavItem
-            symbol="⌁"
-            label="Training"
-          />
-
-          <NavItem
-            symbol="↗"
-            label="Power"
-          />
-
-          <NavItem
-            symbol="○"
-            label="Profile"
-          />
-        </View>
-      </View>
+    <BottomNav active="home"/>
     </View>
+ 
   );
 }
 
@@ -452,33 +432,79 @@ function IntervalBlock({
   );
 }
 
-type NavItemProps = {
+type NavKey =
+  | "home"
+  | "training"
+  | "power"
+  | "profile";
+
+type BottomNavProps = {
+  active: NavKey;
+};
+
+function BottomNav({
+  active,
+}: BottomNavProps) {
+  return (
+    <View style={styles.navWrapper}>
+      <View style={styles.nav}>
+        <Nav
+          symbol="⌂"
+          label="Home"
+          active={active === "home"}
+          onPress={() => router.push("/dashboard")}
+        />
+
+        <Nav
+          symbol="⌁"
+          label="Training"
+          active={active === "training"}
+          onPress={() => router.push("/training")}
+        />
+
+        <Nav
+          symbol="↗"
+          label="Power"
+          active={active === "power"}
+          onPress={() => router.push("/power")}
+        />
+
+        <Nav
+          symbol="○"
+          label="Profile"
+          active={active === "profile"}
+          onPress={() => router.push("/profile")}
+        />
+      </View>
+    </View>
+  );
+}
+
+type NavProps = {
   symbol: string;
   label: string;
   active?: boolean;
+  onPress: () => void;
 };
 
-function NavItem({
+function Nav({
   symbol,
   label,
   active,
-}: NavItemProps) {
+  onPress,
+}: NavProps) {
   return (
     <Pressable
       style={[
         styles.navItem,
-        active
-          ? styles.navItemActive
-          : undefined,
+        active ? styles.navItemActive : undefined,
       ]}
-      onPress={() => {}}
+      onPress={onPress}
     >
       <Text
         style={[
           styles.navSymbol,
-          active
-            ? styles.navSymbolActive
-            : undefined,
+          active ? styles.navSymbolActive : undefined,
         ]}
       >
         {symbol}
@@ -487,9 +513,7 @@ function NavItem({
       <Text
         style={[
           styles.navLabel,
-          active
-            ? styles.navLabelActive
-            : undefined,
+          active ? styles.navLabelActive : undefined,
         ]}
       >
         {label}

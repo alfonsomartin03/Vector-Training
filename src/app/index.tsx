@@ -87,7 +87,7 @@ export default function LandingPage() {
             >
               <Button
                 title="Get started"
-                onPress={() => router.push("/register")}
+                onPress={() => router.push("/dashboard")}
               />
 
               <Button

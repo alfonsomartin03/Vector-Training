@@ -29,7 +29,9 @@ export default function PowerPage() {
       >
         <View style={styles.container}>
           <View style={styles.header}>
-            <Text style={styles.logo}>VECTOR</Text>
+            <Pressable onPress={() => router.push("/")}>
+                        <Text style={styles.logo}>VECTOR</Text>
+                        </Pressable>
 
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>A</Text>

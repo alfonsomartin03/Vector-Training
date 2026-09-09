@@ -32,13 +32,13 @@ export default function ProfilePage() {
           <View style={styles.profileHeader}>
             <View style={styles.largeAvatar}>
               <Text style={styles.largeAvatarText}>
-                AM
+                TU
               </Text>
             </View>
 
             <View>
               <Text style={styles.name}>
-                Alfonso Martin
+                Test User
               </Text>
 
               <Text style={styles.profileSub}>
@@ -191,7 +191,7 @@ export default function ProfilePage() {
           <View style={styles.card}>
             <Row
               label="Email"
-              value="alfonso@example.com"
+              value="user@example.com"
             />
 
             <Row

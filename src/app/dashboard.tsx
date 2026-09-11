@@ -42,7 +42,7 @@ export default function DashboardPage() {
             <Text style={styles.welcomeOverline}>GOOD AFTERNOON</Text>
 
             <Text style={styles.welcomeTitle}>
-              Welcome back, Alfonso.
+              Welcome back, User.
             </Text>
 
             <Text style={styles.welcomeSubtitle}>

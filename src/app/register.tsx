@@ -2,19 +2,20 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { router } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
 import {
-    Animated,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
-    useWindowDimensions,
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
 } from "react-native";
 
+import { supabase } from "@/lib/supabase";
 import { theme } from "../constants/theme";
 
 /* -------------------------------------------------------------------------- */
@@ -93,14 +94,43 @@ export default function RegisterScreen() {
   const isMobile = width < 700;
 
   const [step, setStep] = useState<Step>(0);
+
   const [data, setData] = useState<RegistrationData>(
     initialRegistrationData
   );
 
+  /*
+   * Once Step 1 succeeds, this contains the Supabase Auth user ID.
+   *
+   * We keep it so Steps 2 and 3 don't need to call signUp again.
+   */
+  const [createdUserId, setCreatedUserId] =
+    useState<string | null>(null);
+
+  /*
+   * Separate state for Step 1 account creation.
+   */
+  const [isCreatingAccount, setIsCreatingAccount] =
+    useState(false);
+
+  const [accountError, setAccountError] =
+    useState<string | null>(null);
+
+  /*
+   * State for final onboarding submission.
+   */
+  const [isSubmitting, setIsSubmitting] =
+    useState(false);
+
+  const [submitError, setSubmitError] =
+    useState<string | null>(null);
+
   const opacity = useRef(new Animated.Value(1)).current;
   const translateX = useRef(new Animated.Value(0)).current;
 
-  /* ------------------------------- Validation ------------------------------ */
+  /* ------------------------------------------------------------------------ */
+  /*                                Validation                                */
+  /* ------------------------------------------------------------------------ */
 
   const emailValid = useMemo(() => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
@@ -147,7 +177,9 @@ export default function RegisterScreen() {
     Number(data.powerProfile.twelveMinuteWatts) > 0 &&
     data.powerProfile.maximalEffortsConfirmed;
 
-  /* ------------------------------- Animation ------------------------------- */
+  /* ------------------------------------------------------------------------ */
+  /*                                Animation                                 */
+  /* ------------------------------------------------------------------------ */
 
   const animateToStep = (
     nextStep: Step,
@@ -186,98 +218,296 @@ export default function RegisterScreen() {
     });
   };
 
-  /* -------------------------------- Submit -------------------------------- */
+  /* ------------------------------------------------------------------------ */
+  /*                         Step 1 — Create Account                          */
+  /* ------------------------------------------------------------------------ */
 
-  const handleSubmit = () => {
-    const payload = {
-      account: {
-        firstName: data.account.firstName.trim(),
-        lastName: data.account.lastName.trim(),
-        email: data.account.email.trim().toLowerCase(),
-        password: data.account.password,
-      },
-
-      physiological: {
-        gender: data.physiological.gender,
-        birthDate: data.physiological.birthDate,
-        weightKg: Number(data.physiological.weightKg),
-        primarySport: data.physiological.primarySport,
-        trainingHistory: data.physiological.trainingHistory,
-        weeklyVolume: data.physiological.weeklyVolume,
-      },
-
-      powerProfile: {
-        oneMinuteWatts: Number(
-          data.powerProfile.oneMinuteWatts
-        ),
-        fiveMinuteWatts: Number(
-          data.powerProfile.fiveMinuteWatts
-        ),
-        twelveMinuteWatts: Number(
-          data.powerProfile.twelveMinuteWatts
-        ),
-        maximalEffortsConfirmed:
-          data.powerProfile.maximalEffortsConfirmed,
-      },
-    };
-
-    console.log("Registration payload:", payload);
+  const handleAccountStep = async () => {
+    if (!accountValid || isCreatingAccount) {
+      return;
+    }
 
     /*
-      BACKEND LATER:
+     * If Supabase already created the Auth user and the person simply went
+     * backwards in onboarding, don't create another account.
+     */
+    if (createdUserId) {
+      animateToStep(1);
+      return;
+    }
 
-      await fetch(`${API_URL}/api/auth/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
+    setIsCreatingAccount(true);
+    setAccountError(null);
+
+    try {
+      const email =
+        data.account.email.trim().toLowerCase();
+
+      const {
+        data: authData,
+        error: authError,
+      } = await supabase.auth.signUp({
+        email,
+        password: data.account.password,
       });
-    */
 
-    router.replace("/dashboard");
+      if (authError) {
+        console.error(
+          "Supabase sign-up error:",
+          authError
+        );
+
+        const message =
+          authError.message.toLowerCase();
+
+        if (
+          message.includes("already") ||
+          message.includes("registered") ||
+          message.includes("exists")
+        ) {
+          setAccountError(
+            "An account already exists with this email. Try logging in instead."
+          );
+        } else {
+          setAccountError(authError.message);
+        }
+
+        return;
+      }
+
+      if (!authData.user) {
+        setAccountError(
+          "We couldn't create your account. Please try again."
+        );
+
+        return;
+      }
+
+      /*
+       * Store the Auth UUID so the remaining onboarding data can be attached
+       * to this exact user.
+       */
+      setCreatedUserId(authData.user.id);
+
+      console.log(
+        "Supabase Auth account created:",
+        authData.user.id
+      );
+
+      animateToStep(1);
+    } catch (error) {
+      console.error(
+        "Account creation error:",
+        error
+      );
+
+      setAccountError(
+        "Something went wrong while creating your account. Please try again."
+      );
+    } finally {
+      setIsCreatingAccount(false);
+    }
   };
 
-  /* -------------------------------- Render -------------------------------- */
+  /* ------------------------------------------------------------------------ */
+  /*                    Step 3 — Save Athlete Profile                        */
+  /* ------------------------------------------------------------------------ */
+
+  const handleSubmit = async () => {
+    if (isSubmitting) {
+      return;
+    }
+
+    if (!createdUserId) {
+      setSubmitError(
+        "Your account session could not be found. Please restart registration."
+      );
+
+      return;
+    }
+
+    if (!physiologicalValid || !powerValid) {
+      setSubmitError(
+        "Please complete all required fields before creating your profile."
+      );
+
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const userId = createdUserId;
+
+      /* -------------------------------------------------------------------- */
+      /*                         Save Athlete Profile                          */
+      /* -------------------------------------------------------------------- */
+
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .insert({
+          id: userId,
+
+          first_name:
+            data.account.firstName.trim(),
+
+          last_name:
+            data.account.lastName.trim(),
+
+          gender:
+            data.physiological.gender,
+
+          birth_date:
+            data.physiological.birthDate,
+
+          weight_kg: Number(
+            data.physiological.weightKg
+          ),
+
+          primary_sport:
+            data.physiological.primarySport,
+
+          training_history:
+            data.physiological.trainingHistory,
+
+          weekly_volume:
+            data.physiological.weeklyVolume,
+        });
+
+      if (profileError) {
+        console.error(
+          "Profile creation error:",
+          profileError
+        );
+
+        setSubmitError(
+          "Your account exists, but we couldn't save your athlete profile. Please try again."
+        );
+
+        return;
+      }
+
+      /* -------------------------------------------------------------------- */
+      /*                          Save Power Profile                           */
+      /* -------------------------------------------------------------------- */
+
+      const { error: powerProfileError } =
+        await supabase
+          .from("power_profiles")
+          .insert({
+            user_id: userId,
+
+            one_minute_watts: Number(
+              data.powerProfile.oneMinuteWatts
+            ),
+
+            five_minute_watts: Number(
+              data.powerProfile.fiveMinuteWatts
+            ),
+
+            twelve_minute_watts: Number(
+              data.powerProfile.twelveMinuteWatts
+            ),
+
+            maximal_efforts_confirmed:
+              data.powerProfile
+                .maximalEffortsConfirmed,
+          });
+
+      if (powerProfileError) {
+        console.error(
+          "Power profile creation error:",
+          powerProfileError
+        );
+
+        setSubmitError(
+          "Your athlete profile was saved, but we couldn't save your power profile. Please try again."
+        );
+
+        return;
+      }
+
+      console.log(
+        "Vector registration completed:",
+        userId
+      );
+
+      router.replace("/dashboard");
+    } catch (error) {
+      console.error(
+        "Registration error:",
+        error
+      );
+
+      setSubmitError(
+        "Something went wrong while finishing your profile. Please try again."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  /* ------------------------------------------------------------------------ */
+  /*                                  Render                                  */
+  /* ------------------------------------------------------------------------ */
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={
+          Platform.OS === "ios"
+            ? "padding"
+            : undefined
+        }
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={
+            styles.scrollContent
+          }
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           <View
             style={[
               styles.contentContainer,
-              isMobile && styles.contentContainerMobile,
+              isMobile &&
+                styles.contentContainerMobile,
             ]}
           >
             {/* HEADER */}
 
             <View style={styles.header}>
-              <Pressable onPress={() => router.push("/")}>
-                <Text style={styles.logo}>VECTOR</Text>
+              <Pressable
+                onPress={() =>
+                  router.push("/")
+                }
+              >
+                <Text style={styles.logo}>
+                  VECTOR
+                </Text>
               </Pressable>
             </View>
 
             {/* PROGRESS */}
 
-            <ProgressIndicator step={step} />
+            <ProgressIndicator
+              step={step}
+            />
 
             {/* FORM */}
 
             <Animated.View
               style={[
                 styles.card,
-                isMobile && styles.cardMobile,
+                isMobile &&
+                  styles.cardMobile,
                 {
                   opacity,
-                  transform: [{ translateX }],
+                  transform: [
+                    { translateX },
+                  ],
                 },
               ]}
             >
@@ -285,12 +515,35 @@ export default function RegisterScreen() {
                 <AccountStep
                   data={data}
                   setData={setData}
-                  emailValid={emailValid}
-                  passwordChecks={passwordChecks}
-                  passwordsMatch={passwordsMatch}
-                  valid={accountValid}
-                  isMobile={isMobile}
-                  onNext={() => animateToStep(1)}
+                  emailValid={
+                    emailValid
+                  }
+                  passwordChecks={
+                    passwordChecks
+                  }
+                  passwordsMatch={
+                    passwordsMatch
+                  }
+                  valid={
+                    accountValid
+                  }
+                  isMobile={
+                    isMobile
+                  }
+                  onNext={
+                    handleAccountStep
+                  }
+                  accountError={
+                    accountError
+                  }
+                  isCreatingAccount={
+                    isCreatingAccount
+                  }
+                  accountCreated={
+                    Boolean(
+                      createdUserId
+                    )
+                  }
                 />
               )}
 
@@ -298,9 +551,18 @@ export default function RegisterScreen() {
                 <AthleteStep
                   data={data}
                   setData={setData}
-                  valid={physiologicalValid}
-                  onBack={() => animateToStep(0, -1)}
-                  onNext={() => animateToStep(2)}
+                  valid={
+                    physiologicalValid
+                  }
+                  onBack={() =>
+                    animateToStep(
+                      0,
+                      -1
+                    )
+                  }
+                  onNext={() =>
+                    animateToStep(2)
+                  }
                 />
               )}
 
@@ -309,8 +571,21 @@ export default function RegisterScreen() {
                   data={data}
                   setData={setData}
                   valid={powerValid}
-                  onBack={() => animateToStep(1, -1)}
-                  onSubmit={handleSubmit}
+                  onBack={() =>
+                    animateToStep(
+                      1,
+                      -1
+                    )
+                  }
+                  onSubmit={
+                    handleSubmit
+                  }
+                  isSubmitting={
+                    isSubmitting
+                  }
+                  submitError={
+                    submitError
+                  }
                 />
               )}
             </Animated.View>
@@ -325,63 +600,102 @@ export default function RegisterScreen() {
 /*                            Progress Indicator                              */
 /* -------------------------------------------------------------------------- */
 
-function ProgressIndicator({ step }: { step: Step }) {
-  const labels = ["Account", "Athlete", "Power"];
+function ProgressIndicator({
+  step,
+}: {
+  step: Step;
+}) {
+  const labels = [
+    "Account",
+    "Athlete",
+    "Power",
+  ];
 
   return (
-    <View style={styles.progressWrapper}>
-      <View style={styles.progressRow}>
-        {labels.map((label, index) => {
-          const completed = index < step;
-          const active = index === step;
+    <View
+      style={
+        styles.progressWrapper
+      }
+    >
+      <View
+        style={styles.progressRow}
+      >
+        {labels.map(
+          (label, index) => {
+            const completed =
+              index < step;
 
-          return (
-            <React.Fragment key={label}>
-              <View style={styles.progressItem}>
+            const active =
+              index === step;
+
+            return (
+              <React.Fragment
+                key={label}
+              >
                 <View
-                  style={[
-                    styles.progressCircle,
-                    active && styles.progressCircleActive,
-                    completed &&
-                      styles.progressCircleCompleted,
-                  ]}
+                  style={
+                    styles.progressItem
+                  }
                 >
-                  <Text
+                  <View
                     style={[
-                      styles.progressNumber,
-                      active && styles.progressNumberActive,
+                      styles.progressCircle,
+
+                      active &&
+                        styles.progressCircleActive,
+
                       completed &&
-                        styles.progressNumberCompleted,
+                        styles.progressCircleCompleted,
                     ]}
                   >
-                    {completed ? "✓" : index + 1}
+                    <Text
+                      style={[
+                        styles.progressNumber,
+
+                        active &&
+                          styles.progressNumberActive,
+
+                        completed &&
+                          styles.progressNumberCompleted,
+                      ]}
+                    >
+                      {completed
+                        ? "✓"
+                        : index + 1}
+                    </Text>
+                  </View>
+
+                  <Text
+                    style={[
+                      styles.progressLabel,
+
+                      active &&
+                        styles.progressLabelActive,
+
+                      completed &&
+                        styles.progressLabelCompleted,
+                    ]}
+                  >
+                    {label}
                   </Text>
                 </View>
 
-                <Text
-                  style={[
-                    styles.progressLabel,
-                    active && styles.progressLabelActive,
-                    completed &&
-                      styles.progressLabelCompleted,
-                  ]}
-                >
-                  {label}
-                </Text>
-              </View>
+                {index <
+                  labels.length -
+                    1 && (
+                  <View
+                    style={[
+                      styles.progressLine,
 
-              {index < labels.length - 1 && (
-                <View
-                  style={[
-                    styles.progressLine,
-                    completed &&
-                      styles.progressLineCompleted,
-                  ]}
-                />
-              )}
-            </React.Fragment>
-          );
-        })}
+                      completed &&
+                        styles.progressLineCompleted,
+                    ]}
+                  />
+                )}
+              </React.Fragment>
+            );
+          }
+        )}
       </View>
     </View>
   );
@@ -400,8 +714,12 @@ function AccountStep({
   valid,
   isMobile,
   onNext,
+  accountError,
+  isCreatingAccount,
+  accountCreated,
 }: StepProps & {
   emailValid: boolean;
+
   passwordChecks: {
     length: boolean;
     uppercase: boolean;
@@ -409,17 +727,36 @@ function AccountStep({
     number: boolean;
     special: boolean;
   };
+
   passwordsMatch: boolean;
+
   valid: boolean;
+
   isMobile: boolean;
+
   onNext: () => void;
+
+  accountError: string | null;
+
+  isCreatingAccount: boolean;
+
+  accountCreated: boolean;
 }) {
   const updateAccount = (
     field: keyof RegistrationData["account"],
     value: string
   ) => {
+    /*
+     * Once the actual Supabase account exists, don't let account credentials
+     * diverge from what was sent to Supabase.
+     */
+    if (accountCreated) {
+      return;
+    }
+
     setData((prev) => ({
       ...prev,
+
       account: {
         ...prev.account,
         [field]: value,
@@ -429,41 +766,94 @@ function AccountStep({
 
   return (
     <>
-      <Text style={styles.eyebrow}>STEP 1 OF 3</Text>
+      <Text style={styles.eyebrow}>
+        STEP 1 OF 3
+      </Text>
 
-      <Text style={styles.title}>Create your profile</Text>
+      <Text style={styles.title}>
+        Create your profile
+      </Text>
 
       <Text style={styles.subtitle}>
         Your training starts with understanding you.
       </Text>
 
+      {accountCreated && (
+        <View
+          style={
+            styles.accountCreatedBox
+          }
+        >
+          <Text
+            style={
+              styles.accountCreatedTitle
+            }
+          >
+            Account created
+          </Text>
+
+          <Text
+            style={
+              styles.accountCreatedText
+            }
+          >
+            Your login has already been secured. Continue to finish setting up your athlete profile.
+          </Text>
+        </View>
+      )}
+
       <View
         style={[
           styles.nameRow,
-          isMobile && styles.nameRowMobile,
+          isMobile &&
+            styles.nameRowMobile,
         ]}
       >
-        <View style={styles.nameField}>
+        <View
+          style={styles.nameField}
+        >
           <FormInput
             label="First name"
-            value={data.account.firstName}
-            onChangeText={(value) =>
-              updateAccount("firstName", value)
+            value={
+              data.account.firstName
+            }
+            onChangeText={(
+              value
+            ) =>
+              updateAccount(
+                "firstName",
+                value
+              )
             }
             placeholder="First"
             autoCapitalize="words"
+            editable={
+              !accountCreated
+            }
           />
         </View>
 
-        <View style={styles.nameField}>
+        <View
+          style={styles.nameField}
+        >
           <FormInput
             label="Last name"
-            value={data.account.lastName}
-            onChangeText={(value) =>
-              updateAccount("lastName", value)
+            value={
+              data.account.lastName
+            }
+            onChangeText={(
+              value
+            ) =>
+              updateAccount(
+                "lastName",
+                value
+              )
             }
             placeholder="Last"
             autoCapitalize="words"
+            editable={
+              !accountCreated
+            }
           />
         </View>
       </View>
@@ -472,85 +862,178 @@ function AccountStep({
         label="Email"
         value={data.account.email}
         onChangeText={(value) =>
-          updateAccount("email", value)
+          updateAccount(
+            "email",
+            value
+          )
         }
         placeholder="you@example.com"
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
+        editable={!accountCreated}
       />
 
-      {data.account.email.length > 0 && !emailValid && (
-        <Text style={styles.errorText}>
-          Enter a valid email address.
-        </Text>
-      )}
+      {data.account.email.length >
+        0 &&
+        !emailValid && (
+          <Text
+            style={
+              styles.errorText
+            }
+          >
+            Enter a valid email address.
+          </Text>
+        )}
 
       <FormInput
         label="Password"
-        value={data.account.password}
+        value={
+          data.account.password
+        }
         onChangeText={(value) =>
-          updateAccount("password", value)
+          updateAccount(
+            "password",
+            value
+          )
         }
         placeholder="Create a password"
         secureTextEntry
         allowPasswordToggle
         autoCapitalize="none"
         autoCorrect={false}
+        editable={!accountCreated}
       />
 
-      {data.account.password.length > 0 && (
-        <View style={styles.requirements}>
-          <Requirement
-            met={passwordChecks.length}
-            text="At least 8 characters"
-          />
+      {data.account.password
+        .length > 0 &&
+        !accountCreated && (
+          <View
+            style={
+              styles.requirements
+            }
+          >
+            <Requirement
+              met={
+                passwordChecks.length
+              }
+              text="At least 8 characters"
+            />
 
-          <Requirement
-            met={passwordChecks.uppercase}
-            text="One uppercase letter"
-          />
+            <Requirement
+              met={
+                passwordChecks.uppercase
+              }
+              text="One uppercase letter"
+            />
 
-          <Requirement
-            met={passwordChecks.lowercase}
-            text="One lowercase letter"
-          />
+            <Requirement
+              met={
+                passwordChecks.lowercase
+              }
+              text="One lowercase letter"
+            />
 
-          <Requirement
-            met={passwordChecks.number}
-            text="One number"
-          />
+            <Requirement
+              met={
+                passwordChecks.number
+              }
+              text="One number"
+            />
 
-          <Requirement
-            met={passwordChecks.special}
-            text="One special character"
-          />
-        </View>
-      )}
+            <Requirement
+              met={
+                passwordChecks.special
+              }
+              text="One special character"
+            />
+          </View>
+        )}
 
       <FormInput
         label="Confirm password"
-        value={data.account.confirmPassword}
+        value={
+          data.account.confirmPassword
+        }
         onChangeText={(value) =>
-          updateAccount("confirmPassword", value)
+          updateAccount(
+            "confirmPassword",
+            value
+          )
         }
         placeholder="Repeat your password"
         secureTextEntry
         allowPasswordToggle
         autoCapitalize="none"
         autoCorrect={false}
+        editable={!accountCreated}
       />
 
-      {data.account.confirmPassword.length > 0 &&
-        !passwordsMatch && (
-          <Text style={styles.errorText}>
+      {data.account
+        .confirmPassword.length >
+        0 &&
+        !passwordsMatch &&
+        !accountCreated && (
+          <Text
+            style={
+              styles.errorText
+            }
+          >
             Passwords do not match.
           </Text>
         )}
 
+      {accountError && (
+        <View
+          style={
+            styles.accountErrorBox
+          }
+        >
+          <Text
+            style={
+              styles.accountErrorText
+            }
+          >
+            {accountError}
+          </Text>
+
+          {accountError
+            .toLowerCase()
+            .includes(
+              "already exists"
+            ) && (
+            <Pressable
+              onPress={() =>
+                router.push(
+                  "/login"
+                )
+              }
+            >
+              <Text
+                style={
+                  styles.loginLink
+                }
+              >
+                Log in instead →
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+
       <PrimaryButton
-        label="Continue"
-        disabled={!valid}
+        label={
+          isCreatingAccount
+            ? "Checking account..."
+            : accountCreated
+              ? "Continue"
+              : "Create account & continue"
+        }
+        disabled={
+          (!valid &&
+            !accountCreated) ||
+          isCreatingAccount
+        }
         onPress={onNext}
       />
     </>
@@ -578,6 +1061,7 @@ function AthleteStep({
   ) => {
     setData((prev) => ({
       ...prev,
+
       physiological: {
         ...prev.physiological,
         [field]: value,
@@ -587,18 +1071,21 @@ function AthleteStep({
 
   return (
     <>
-      <Text style={styles.eyebrow}>STEP 2 OF 3</Text>
+      <Text style={styles.eyebrow}>
+        STEP 2 OF 3
+      </Text>
 
       <Text style={styles.title}>
         Tell us about yourself
       </Text>
 
       <Text style={styles.subtitle}>
-        We use this information to understand your current
-        training background and scale your training appropriately.
+        We use this information to understand your current training background and scale your training appropriately.
       </Text>
 
-      <Text style={styles.label}>Gender</Text>
+      <Text style={styles.label}>
+        Gender
+      </Text>
 
       <OptionRow
         options={[
@@ -606,35 +1093,56 @@ function AthleteStep({
             label: "Male",
             value: "male",
           },
+
           {
             label: "Female",
             value: "female",
           },
+
           {
-            label: "Prefer not to say",
-            value: "prefer_not_to_say",
+            label:
+              "Prefer not to say",
+            value:
+              "prefer_not_to_say",
           },
         ]}
-        selected={data.physiological.gender}
+        selected={
+          data.physiological
+            .gender
+        }
         onSelect={(value) =>
-          updatePhys("gender", value)
+          updatePhys(
+            "gender",
+            value
+          )
         }
       />
 
       <BirthdayPicker
-        value={data.physiological.birthDate}
+        value={
+          data.physiological
+            .birthDate
+        }
         onChange={(value) =>
-          updatePhys("birthDate", value)
+          updatePhys(
+            "birthDate",
+            value
+          )
         }
       />
 
       <FormInput
         label="Weight"
-        value={data.physiological.weightKg}
+        value={
+          data.physiological
+            .weightKg
+        }
         onChangeText={(value) =>
           updatePhys(
             "weightKg",
-            sanitizeDecimal(value)
+            sanitizeDecimal(
+              value
+            )
           )
         }
         placeholder="70.0"
@@ -646,19 +1154,39 @@ function AthleteStep({
         Primary sport
       </Text>
 
-      <View style={styles.lockedOption}>
+      <View
+        style={
+          styles.lockedOption
+        }
+      >
         <View>
-          <Text style={styles.lockedOptionText}>
+          <Text
+            style={
+              styles.lockedOptionText
+            }
+          >
             Cycling
           </Text>
 
-          <Text style={styles.lockedOptionSubtext}>
+          <Text
+            style={
+              styles.lockedOptionSubtext
+            }
+          >
             More sports coming later
           </Text>
         </View>
 
-        <View style={styles.sportIndicator}>
-          <Text style={styles.sportIndicatorText}>
+        <View
+          style={
+            styles.sportIndicator
+          }
+        >
+          <Text
+            style={
+              styles.sportIndicatorText
+            }
+          >
             ✓
           </Text>
         </View>
@@ -673,20 +1201,27 @@ function AthleteStep({
           {
             value: "beginner",
             title: "Beginner",
-            subtitle: "New to structured training",
+            subtitle:
+              "New to structured training",
           },
+
           {
-            value: "intermediate",
-            title: "Intermediate",
+            value:
+              "intermediate",
+            title:
+              "Intermediate",
             subtitle:
               "Some experience with structured training",
           },
+
           {
-            value: "advanced",
+            value:
+              "advanced",
             title: "Advanced",
             subtitle:
               "Experienced competitive athlete",
           },
+
           {
             value: "pro",
             title: "Pro",
@@ -695,10 +1230,14 @@ function AthleteStep({
           },
         ]}
         selected={
-          data.physiological.trainingHistory
+          data.physiological
+            .trainingHistory
         }
         onSelect={(value) =>
-          updatePhys("trainingHistory", value)
+          updatePhys(
+            "trainingHistory",
+            value
+          )
         }
       />
 
@@ -712,18 +1251,26 @@ function AthleteStep({
             label: "1–5 h",
             value: "1-5",
           },
+
           {
             label: "6–12 h",
             value: "6-12",
           },
+
           {
             label: "12+ h",
             value: "12+",
           },
         ]}
-        selected={data.physiological.weeklyVolume}
+        selected={
+          data.physiological
+            .weeklyVolume
+        }
         onSelect={(value) =>
-          updatePhys("weeklyVolume", value)
+          updatePhys(
+            "weeklyVolume",
+            value
+          )
         }
       />
 
@@ -745,13 +1292,19 @@ function BirthdayPicker({
   onChange,
 }: {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (
+    value: string
+  ) => void;
 }) {
-  const [showPicker, setShowPicker] =
-    useState(false);
+  const [
+    showPicker,
+    setShowPicker,
+  ] = useState(false);
 
   const selectedDate = value
-    ? new Date(`${value}T12:00:00`)
+    ? new Date(
+        `${value}T12:00:00`
+      )
     : new Date(2000, 0, 1);
 
   const today = new Date();
@@ -766,13 +1319,18 @@ function BirthdayPicker({
     _event: any,
     date?: Date
   ) => {
-    if (Platform.OS !== "ios") {
+    if (
+      Platform.OS !== "ios"
+    ) {
       setShowPicker(false);
     }
 
-    if (!date) return;
+    if (!date) {
+      return;
+    }
 
-    const year = date.getFullYear();
+    const year =
+      date.getFullYear();
 
     const month = String(
       date.getMonth() + 1
@@ -782,15 +1340,23 @@ function BirthdayPicker({
       date.getDate()
     ).padStart(2, "0");
 
-    onChange(`${year}-${month}-${day}`);
+    onChange(
+      `${year}-${month}-${day}`
+    );
   };
 
-  /* ---------------------------------- Web --------------------------------- */
-
-  if (Platform.OS === "web") {
+  if (
+    Platform.OS === "web"
+  ) {
     return (
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>
+      <View
+        style={
+          styles.inputGroup
+        }
+      >
+        <Text
+          style={styles.label}
+        >
           Birthday
         </Text>
 
@@ -798,83 +1364,130 @@ function BirthdayPicker({
           type="date"
           value={value}
           max={maxDate}
-          onChange={(event) =>
-            onChange(event.target.value)
+          onChange={(
+            event
+          ) =>
+            onChange(
+              event.target
+                .value
+            )
           }
           style={{
             minHeight: 56,
             width: "100%",
-            boxSizing: "border-box",
-            backgroundColor: "#FAFBF9",
-            border: "1.5px solid #D6DAD5",
-            borderRadius: theme.radius.md,
-            padding: "0 16px",
-            color: theme.colors.text,
+            boxSizing:
+              "border-box",
+            backgroundColor:
+              "#FAFBF9",
+            border:
+              "1.5px solid #D6DAD5",
+            borderRadius:
+              theme.radius.md,
+            padding:
+              "0 16px",
+            color:
+              theme.colors
+                .text,
             fontSize: 16,
-            fontFamily: "inherit",
+            fontFamily:
+              "inherit",
             outline: "none",
-            colorScheme: "light",
+            colorScheme:
+              "light",
           }}
         />
       </View>
     );
   }
 
-  /* ------------------------------ iOS/Android ----------------------------- */
-
   return (
-    <View style={styles.inputGroup}>
+    <View
+      style={styles.inputGroup}
+    >
       <Text style={styles.label}>
         Birthday
       </Text>
 
       <Pressable
-        style={styles.dateButton}
-        onPress={() => setShowPicker(true)}
+        style={
+          styles.dateButton
+        }
+        onPress={() =>
+          setShowPicker(true)
+        }
       >
         <Text
           style={[
             styles.dateButtonText,
-            !value && styles.datePlaceholder,
+
+            !value &&
+              styles.datePlaceholder,
           ]}
         >
           {value
             ? selectedDate.toLocaleDateString(
                 "en-US",
                 {
-                  month: "long",
-                  day: "numeric",
-                  year: "numeric",
+                  month:
+                    "long",
+                  day:
+                    "numeric",
+                  year:
+                    "numeric",
                 }
               )
             : "Select your birthday"}
         </Text>
 
-        <Text style={styles.dateIcon}>▾</Text>
+        <Text
+          style={styles.dateIcon}
+        >
+          ▾
+        </Text>
       </Pressable>
 
       {showPicker && (
-        <View style={styles.datePickerContainer}>
+        <View
+          style={
+            styles.datePickerContainer
+          }
+        >
           <DateTimePicker
-            value={selectedDate}
+            value={
+              selectedDate
+            }
             mode="date"
             display={
-              Platform.OS === "ios"
+              Platform.OS ===
+              "ios"
                 ? "spinner"
                 : "default"
             }
-            onChange={handleNativeChange}
-            maximumDate={today}
+            onChange={
+              handleNativeChange
+            }
+            maximumDate={
+              today
+            }
           />
 
-          {Platform.OS === "ios" && (
+          {Platform.OS ===
+            "ios" && (
             <Pressable
-              style={styles.dateDoneButton}
+              style={
+                styles.dateDoneButton
+              }
               onPress={() =>
-                setShowPicker(false)
+                setShowPicker(
+                  false
+                )
               }
             >
-              <Text style={styles.dateDoneText}>
+              <Text
+                style={
+                  styles.dateDoneText
+                }
+              >
                 Done
               </Text>
             </Pressable>
@@ -895,10 +1508,14 @@ function PowerStep({
   valid,
   onBack,
   onSubmit,
+  isSubmitting,
+  submitError,
 }: StepProps & {
   valid: boolean;
   onBack: () => void;
   onSubmit: () => void;
+  isSubmitting: boolean;
+  submitError: string | null;
 }) {
   const weight = Number(
     data.physiological.weightKg
@@ -910,6 +1527,7 @@ function PowerStep({
   ) => {
     setData((prev) => ({
       ...prev,
+
       powerProfile: {
         ...prev.powerProfile,
         [field]: value,
@@ -917,14 +1535,19 @@ function PowerStep({
     }));
   };
 
-  const wattsPerKg = (watts: string) => {
-    const power = Number(watts);
+  const wattsPerKg = (
+    watts: string
+  ) => {
+    const power =
+      Number(watts);
 
     if (!weight || !power) {
       return null;
     }
 
-    return (power / weight).toFixed(2);
+    return (
+      power / weight
+    ).toFixed(2);
   };
 
   return (
@@ -938,23 +1561,33 @@ function PowerStep({
       </Text>
 
       <Text style={styles.subtitle}>
-        Your recent maximal efforts help Vector
-        understand your current power-duration profile.
+        Your recent maximal efforts help Vector understand your current power-duration profile.
       </Text>
 
-      <View style={styles.infoBox}>
-        <View style={styles.infoMarker} />
+      <View
+        style={styles.infoBox}
+      >
+        <View
+          style={styles.infoMarker}
+        />
 
-        <View style={styles.infoContent}>
-          <Text style={styles.infoTitle}>
+        <View
+          style={
+            styles.infoContent
+          }
+        >
+          <Text
+            style={
+              styles.infoTitle
+            }
+          >
             For accurate results
           </Text>
 
-          <Text style={styles.infoText}>
-            Enter your best absolute all-out efforts
-            from the past 42 days. Do not enter a
-            normal interval or estimated training
-            value.
+          <Text
+            style={styles.infoText}
+          >
+            Enter your best absolute all-out efforts from the past 42 days. Do not enter a normal interval or estimated training value.
           </Text>
         </View>
       </View>
@@ -963,16 +1596,20 @@ function PowerStep({
         label="1 MINUTE POWER"
         description="Short-duration / anaerobic capacity"
         value={
-          data.powerProfile.oneMinuteWatts
+          data.powerProfile
+            .oneMinuteWatts
         }
         onChange={(value) =>
           updatePower(
             "oneMinuteWatts",
-            sanitizeInteger(value)
+            sanitizeInteger(
+              value
+            )
           )
         }
         wattsPerKg={wattsPerKg(
-          data.powerProfile.oneMinuteWatts
+          data.powerProfile
+            .oneMinuteWatts
         )}
       />
 
@@ -980,16 +1617,20 @@ function PowerStep({
         label="5 MINUTE POWER"
         description="VO₂-range aerobic power"
         value={
-          data.powerProfile.fiveMinuteWatts
+          data.powerProfile
+            .fiveMinuteWatts
         }
         onChange={(value) =>
           updatePower(
             "fiveMinuteWatts",
-            sanitizeInteger(value)
+            sanitizeInteger(
+              value
+            )
           )
         }
         wattsPerKg={wattsPerKg(
-          data.powerProfile.fiveMinuteWatts
+          data.powerProfile
+            .fiveMinuteWatts
         )}
       />
 
@@ -997,24 +1638,31 @@ function PowerStep({
         label="12 MINUTE POWER"
         description="Sustained aerobic power"
         value={
-          data.powerProfile.twelveMinuteWatts
+          data.powerProfile
+            .twelveMinuteWatts
         }
         onChange={(value) =>
           updatePower(
             "twelveMinuteWatts",
-            sanitizeInteger(value)
+            sanitizeInteger(
+              value
+            )
           )
         }
         wattsPerKg={wattsPerKg(
-          data.powerProfile.twelveMinuteWatts
+          data.powerProfile
+            .twelveMinuteWatts
         )}
       />
 
       <Pressable
-        style={styles.checkboxRow}
+        style={
+          styles.checkboxRow
+        }
         onPress={() =>
           updatePower(
             "maximalEffortsConfirmed",
+
             !data.powerProfile
               .maximalEffortsConfirmed
           )
@@ -1023,6 +1671,7 @@ function PowerStep({
         <View
           style={[
             styles.checkbox,
+
             data.powerProfile
               .maximalEffortsConfirmed &&
               styles.checkboxChecked,
@@ -1030,24 +1679,53 @@ function PowerStep({
         >
           {data.powerProfile
             .maximalEffortsConfirmed && (
-            <Text style={styles.checkmark}>
+            <Text
+              style={
+                styles.checkmark
+              }
+            >
               ✓
             </Text>
           )}
         </View>
 
-        <Text style={styles.checkboxText}>
-          I confirm these efforts were completed
-          within the past 42 days and represent
-          maximal efforts.
+        <Text
+          style={
+            styles.checkboxText
+          }
+        >
+          I confirm these efforts were completed within the past 42 days and represent maximal efforts.
         </Text>
       </Pressable>
+
+      {submitError && (
+        <View
+          style={
+            styles.accountErrorBox
+          }
+        >
+          <Text
+            style={
+              styles.accountErrorText
+            }
+          >
+            {submitError}
+          </Text>
+        </View>
+      )}
 
       <NavigationButtons
         onBack={onBack}
         onNext={onSubmit}
-        nextLabel="Create profile"
-        nextDisabled={!valid}
+        nextLabel={
+          isSubmitting
+            ? "Saving profile..."
+            : "Create profile"
+        }
+        nextDisabled={
+          !valid ||
+          isSubmitting
+        }
       />
     </>
   );
@@ -1061,44 +1739,70 @@ function FormInput({
   label,
   rightLabel,
   allowPasswordToggle = false,
+  editable = true,
   ...props
-}: React.ComponentProps<typeof TextInput> & {
+}: React.ComponentProps<
+  typeof TextInput
+> & {
   label: string;
   rightLabel?: string;
   allowPasswordToggle?: boolean;
 }) {
-  const [passwordVisible, setPasswordVisible] =
-    useState(false);
+  const [
+    passwordVisible,
+    setPasswordVisible,
+  ] = useState(false);
 
   return (
-    <View style={styles.inputGroup}>
+    <View
+      style={styles.inputGroup}
+    >
       <Text style={styles.label}>
         {label}
       </Text>
 
-      <View style={styles.inputWrapper}>
+      <View
+        style={[
+          styles.inputWrapper,
+
+          !editable &&
+            styles.inputWrapperDisabled,
+        ]}
+      >
         <TextInput
           {...props}
+          editable={editable}
           secureTextEntry={
             allowPasswordToggle
               ? !passwordVisible
               : props.secureTextEntry
           }
-          style={styles.input}
+          style={[
+            styles.input,
+
+            !editable &&
+              styles.inputDisabled,
+          ]}
           placeholderTextColor="#A7ADA9"
         />
 
         {allowPasswordToggle && (
           <Pressable
+            disabled={!editable}
             onPress={() =>
               setPasswordVisible(
-                (previous) => !previous
+                (previous) =>
+                  !previous
               )
             }
-            style={styles.passwordToggle}
+            style={
+              styles.passwordToggle
+            }
           >
             <Text
-              style={styles.passwordToggleText}
+              style={
+                styles.passwordToggleText
+              }
             >
               {passwordVisible
                 ? "Hide"
@@ -1109,7 +1813,9 @@ function FormInput({
 
         {rightLabel && (
           <Text
-            style={styles.inputRightLabel}
+            style={
+              styles.inputRightLabel
+            }
           >
             {rightLabel}
           </Text>
@@ -1134,10 +1840,13 @@ function Requirement({
     <Text
       style={[
         styles.requirementText,
-        met && styles.requirementMet,
+
+        met &&
+          styles.requirementMet,
       ]}
     >
-      {met ? "✓" : "○"} {text}
+      {met ? "✓" : "○"}{" "}
+      {text}
     </Text>
   );
 }
@@ -1155,39 +1864,54 @@ function OptionRow({
     label: string;
     value: string;
   }[];
+
   selected: string;
-  onSelect: (value: any) => void;
+
+  onSelect: (
+    value: any
+  ) => void;
 }) {
   return (
-    <View style={styles.optionRow}>
-      {options.map((option) => {
-        const active =
-          selected === option.value;
+    <View
+      style={styles.optionRow}
+    >
+      {options.map(
+        (option) => {
+          const active =
+            selected ===
+            option.value;
 
-        return (
-          <Pressable
-            key={option.value}
-            style={[
-              styles.optionButton,
-              active &&
-                styles.optionButtonActive,
-            ]}
-            onPress={() =>
-              onSelect(option.value)
-            }
-          >
-            <Text
+          return (
+            <Pressable
+              key={
+                option.value
+              }
               style={[
-                styles.optionText,
+                styles.optionButton,
+
                 active &&
-                  styles.optionTextActive,
+                  styles.optionButtonActive,
               ]}
+              onPress={() =>
+                onSelect(
+                  option.value
+                )
+              }
             >
-              {option.label}
-            </Text>
-          </Pressable>
-        );
-      })}
+              <Text
+                style={[
+                  styles.optionText,
+
+                  active &&
+                    styles.optionTextActive,
+                ]}
+              >
+                {option.label}
+              </Text>
+            </Pressable>
+          );
+        }
+      )}
     </View>
   );
 }
@@ -1206,47 +1930,64 @@ function OptionColumn({
     title: string;
     subtitle: string;
   }[];
+
   selected: string;
-  onSelect: (value: any) => void;
+
+  onSelect: (
+    value: any
+  ) => void;
 }) {
   return (
-    <View style={styles.optionColumn}>
-      {options.map((option) => {
-        const active =
-          selected === option.value;
+    <View
+      style={
+        styles.optionColumn
+      }
+    >
+      {options.map(
+        (option) => {
+          const active =
+            selected ===
+            option.value;
 
-        return (
-          <Pressable
-            key={option.value}
-            style={[
-              styles.historyOption,
-              active &&
-                styles.historyOptionActive,
-            ]}
-            onPress={() =>
-              onSelect(option.value)
-            }
-          >
-            <Text
+          return (
+            <Pressable
+              key={
+                option.value
+              }
               style={[
-                styles.historyTitle,
-                active &&
-                  styles.historyTitleActive,
-              ]}
-            >
-              {option.title}
-            </Text>
+                styles.historyOption,
 
-            <Text
-              style={
-                styles.historySubtitle
+                active &&
+                  styles.historyOptionActive,
+              ]}
+              onPress={() =>
+                onSelect(
+                  option.value
+                )
               }
             >
-              {option.subtitle}
-            </Text>
-          </Pressable>
-        );
-      })}
+              <Text
+                style={[
+                  styles.historyTitle,
+
+                  active &&
+                    styles.historyTitleActive,
+                ]}
+              >
+                {option.title}
+              </Text>
+
+              <Text
+                style={
+                  styles.historySubtitle
+                }
+              >
+                {option.subtitle}
+              </Text>
+            </Pressable>
+          );
+        }
+      )}
     </View>
   );
 }
@@ -1265,27 +2006,55 @@ function PowerInput({
   label: string;
   description: string;
   value: string;
-  onChange: (value: string) => void;
-  wattsPerKg: string | null;
+
+  onChange: (
+    value: string
+  ) => void;
+
+  wattsPerKg:
+    | string
+    | null;
 }) {
   return (
-    <View style={styles.powerCard}>
-      <View style={styles.powerCardTop}>
-        <View style={styles.powerCardHeading}>
-          <Text style={styles.powerLabel}>
+    <View
+      style={styles.powerCard}
+    >
+      <View
+        style={
+          styles.powerCardTop
+        }
+      >
+        <View
+          style={
+            styles.powerCardHeading
+          }
+        >
+          <Text
+            style={
+              styles.powerLabel
+            }
+          >
             {label}
           </Text>
 
           <Text
-            style={styles.powerDescription}
+            style={
+              styles.powerDescription
+            }
           >
             {description}
           </Text>
         </View>
 
         {wattsPerKg && (
-          <View style={styles.wkgPill}>
-            <Text style={styles.wkg}>
+          <View
+            style={
+              styles.wkgPill
+            }
+          >
+            <Text
+              style={styles.wkg}
+            >
               {wattsPerKg} W/kg
             </Text>
           </View>
@@ -1293,18 +2062,28 @@ function PowerInput({
       </View>
 
       <View
-        style={styles.powerInputWrapper}
+        style={
+          styles.powerInputWrapper
+        }
       >
         <TextInput
           value={value}
-          onChangeText={onChange}
+          onChangeText={
+            onChange
+          }
           keyboardType="number-pad"
           placeholder="0"
           placeholderTextColor="#A7ADA9"
-          style={styles.powerInput}
+          style={
+            styles.powerInput
+          }
         />
 
-        <Text style={styles.powerUnit}>
+        <Text
+          style={
+            styles.powerUnit
+          }
+        >
           W
         </Text>
       </View>
@@ -1313,7 +2092,7 @@ function PowerInput({
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                Buttons                                     */
+/*                                  Buttons                                   */
 /* -------------------------------------------------------------------------- */
 
 function PrimaryButton({
@@ -1329,10 +2108,14 @@ function PrimaryButton({
     <Pressable
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [
+      style={({
+        pressed,
+      }) => [
         styles.primaryButton,
+
         disabled &&
           styles.primaryButtonDisabled,
+
         pressed &&
           !disabled &&
           styles.primaryButtonPressed,
@@ -1341,6 +2124,7 @@ function PrimaryButton({
       <Text
         style={[
           styles.primaryButtonText,
+
           disabled &&
             styles.primaryButtonTextDisabled,
         ]}
@@ -1363,24 +2147,36 @@ function NavigationButtons({
   nextLabel?: string;
 }) {
   return (
-    <View style={styles.navigationRow}>
+    <View
+      style={
+        styles.navigationRow
+      }
+    >
       <Pressable
-        style={styles.secondaryButton}
+        style={
+          styles.secondaryButton
+        }
         onPress={onBack}
       >
         <Text
-          style={styles.secondaryButtonText}
+          style={
+            styles.secondaryButtonText
+          }
         >
           ← Back
         </Text>
       </Pressable>
 
       <View
-        style={styles.navigationPrimary}
+        style={
+          styles.navigationPrimary
+        }
       >
         <PrimaryButton
           label={nextLabel}
-          disabled={nextDisabled}
+          disabled={
+            nextDisabled
+          }
           onPress={onNext}
         />
       </View>
@@ -1392,15 +2188,26 @@ function NavigationButtons({
 /*                              Sanitization                                  */
 /* -------------------------------------------------------------------------- */
 
-function sanitizeInteger(value: string) {
-  return value.replace(/[^0-9]/g, "");
+function sanitizeInteger(
+  value: string
+) {
+  return value.replace(
+    /[^0-9]/g,
+    ""
+  );
 }
 
-function sanitizeDecimal(value: string) {
+function sanitizeDecimal(
+  value: string
+) {
   const cleaned =
-    value.replace(/[^0-9.]/g, "");
+    value.replace(
+      /[^0-9.]/g,
+      ""
+    );
 
-  const parts = cleaned.split(".");
+  const parts =
+    cleaned.split(".");
 
   if (parts.length <= 1) {
     return cleaned;
@@ -1418,7 +2225,8 @@ function sanitizeDecimal(value: string) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor:
+      theme.colors.background,
   },
 
   container: {
@@ -1427,7 +2235,8 @@ const styles = StyleSheet.create({
 
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: theme.spacing.xxl,
+    paddingBottom:
+      theme.spacing.xxl,
   },
 
   contentContainer: {
@@ -1441,8 +2250,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
 
-  /* -------------------------------- Header -------------------------------- */
-
   header: {
     height: 92,
     flexDirection: "row",
@@ -1450,16 +2257,16 @@ const styles = StyleSheet.create({
   },
 
   logo: {
-    color: theme.colors.text,
+    color:
+      theme.colors.text,
     fontSize: 18,
     fontWeight: "800",
     letterSpacing: 4,
   },
 
-  /* ------------------------------- Progress ------------------------------- */
-
   progressWrapper: {
-    marginBottom: theme.spacing.lg,
+    marginBottom:
+      theme.spacing.lg,
   },
 
   progressRow: {
@@ -1475,84 +2282,88 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-
     alignItems: "center",
     justifyContent: "center",
-
-    backgroundColor: "#F1F2F0",
-
+    backgroundColor:
+      "#F1F2F0",
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor:
+      theme.colors.border,
   },
 
   progressCircleActive: {
-    backgroundColor: theme.colors.accentSoft,
-    borderColor: theme.colors.accent,
+    backgroundColor:
+      theme.colors.accentSoft,
+    borderColor:
+      theme.colors.accent,
   },
 
   progressCircleCompleted: {
-    backgroundColor: theme.colors.accent,
-    borderColor: theme.colors.accent,
+    backgroundColor:
+      theme.colors.accent,
+    borderColor:
+      theme.colors.accent,
   },
 
   progressNumber: {
-    color: theme.colors.textSecondary,
+    color:
+      theme.colors.textSecondary,
     fontSize: 12,
     fontWeight: "700",
   },
 
   progressNumberActive: {
-    color: theme.colors.accent,
+    color:
+      theme.colors.accent,
   },
 
   progressNumberCompleted: {
-    color: theme.colors.white,
+    color:
+      theme.colors.white,
   },
 
   progressLabel: {
     marginTop: 7,
-
-    color: theme.colors.textSecondary,
-
+    color:
+      theme.colors.textSecondary,
     fontSize: 11,
     fontWeight: "600",
   },
 
   progressLabelActive: {
-    color: theme.colors.accent,
+    color:
+      theme.colors.accent,
     fontWeight: "700",
   },
 
   progressLabelCompleted: {
-    color: theme.colors.text,
+    color:
+      theme.colors.text,
   },
 
   progressLine: {
     flex: 1,
     height: 2,
-
     marginHorizontal: 12,
     marginTop: 16,
-
-    backgroundColor: theme.colors.border,
+    backgroundColor:
+      theme.colors.border,
   },
 
   progressLineCompleted: {
-    backgroundColor: theme.colors.accent,
+    backgroundColor:
+      theme.colors.accent,
   },
-
-  /* -------------------------------- Card ---------------------------------- */
 
   card: {
     width: "100%",
-
-    backgroundColor: theme.colors.surface,
-
+    backgroundColor:
+      theme.colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-
-    borderRadius: theme.radius.lg,
-
+    borderColor:
+      theme.colors.border,
+    borderRadius:
+      theme.radius.lg,
     padding: 38,
   },
 
@@ -1560,43 +2371,88 @@ const styles = StyleSheet.create({
     padding: 22,
   },
 
-  /* ------------------------------- Headings ------------------------------- */
-
   eyebrow: {
-    color: theme.colors.accent,
-
+    color:
+      theme.colors.accent,
     fontSize: 11,
     fontWeight: "700",
-
     letterSpacing: 1.5,
-
     marginBottom: 12,
   },
 
   title: {
-    color: theme.colors.text,
-
-    fontSize: theme.typography.h1,
+    color:
+      theme.colors.text,
+    fontSize:
+      theme.typography.h1,
     lineHeight: 50,
-
     fontWeight: "700",
-
     letterSpacing: -1.6,
   },
 
   subtitle: {
     maxWidth: 700,
-
-    color: theme.colors.textSecondary,
-
+    color:
+      theme.colors.textSecondary,
     fontSize: 17,
     lineHeight: 24,
-
     marginTop: 10,
     marginBottom: 32,
   },
 
-  /* -------------------------------- Forms --------------------------------- */
+  accountCreatedBox: {
+    backgroundColor:
+      theme.colors.accentSoft,
+    borderWidth: 1,
+    borderColor:
+      theme.colors.accent,
+    borderRadius:
+      theme.radius.md,
+    padding: 16,
+    marginBottom: 24,
+  },
+
+  accountCreatedTitle: {
+    color:
+      theme.colors.accent,
+    fontSize: 13,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+
+  accountCreatedText: {
+    color:
+      theme.colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+
+  accountErrorBox: {
+    backgroundColor:
+      "#FFF4F4",
+    borderWidth: 1,
+    borderColor:
+      "#F2CACA",
+    borderRadius:
+      theme.radius.md,
+    padding: 14,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+
+  accountErrorText: {
+    color: "#B74848",
+    fontSize: 13,
+    lineHeight: 19,
+  },
+
+  loginLink: {
+    color:
+      theme.colors.accent,
+    fontSize: 13,
+    fontWeight: "700",
+    marginTop: 8,
+  },
 
   nameRow: {
     flexDirection: "row",
@@ -1617,72 +2473,74 @@ const styles = StyleSheet.create({
   },
 
   label: {
-    color: theme.colors.textSecondary,
-
+    color:
+      theme.colors.textSecondary,
     fontSize: 13,
     fontWeight: "600",
-
     marginBottom: 8,
   },
 
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-
-    backgroundColor: "#FAFBF9",
-
+    backgroundColor:
+      "#FAFBF9",
     borderWidth: 1.5,
-    borderColor: "#D6DAD5",
+    borderColor:
+      "#D6DAD5",
+    borderRadius:
+      theme.radius.md,
+  },
 
-    borderRadius: theme.radius.md,
+  inputWrapperDisabled: {
+    backgroundColor:
+      "#F1F2F0",
   },
 
   input: {
     flex: 1,
-
     minHeight: 56,
-
-    paddingHorizontal: theme.spacing.md,
-
-    color: theme.colors.text,
-
+    paddingHorizontal:
+      theme.spacing.md,
+    color:
+      theme.colors.text,
     fontSize: 16,
   },
 
+  inputDisabled: {
+    color:
+      theme.colors.textSecondary,
+  },
+
   inputRightLabel: {
-    color: theme.colors.textSecondary,
-
-    paddingHorizontal: theme.spacing.md,
-
+    color:
+      theme.colors.textSecondary,
+    paddingHorizontal:
+      theme.spacing.md,
     fontSize: 13,
     fontWeight: "600",
   },
 
   passwordToggle: {
     minHeight: 56,
-
-    paddingHorizontal: theme.spacing.md,
-
+    paddingHorizontal:
+      theme.spacing.md,
     justifyContent: "center",
   },
 
   passwordToggleText: {
-    color: theme.colors.accent,
-
+    color:
+      theme.colors.accent,
     fontSize: 12,
     fontWeight: "700",
   },
 
   errorText: {
     color: "#D95C5C",
-
     fontSize: 12,
-
     marginTop: -10,
     marginBottom: 16,
   },
-
-  /* -------------------------- Password Requirements ----------------------- */
 
   requirements: {
     marginTop: -8,
@@ -1691,180 +2549,166 @@ const styles = StyleSheet.create({
 
   requirementText: {
     color: "#A7ADA9",
-
     fontSize: 12,
     lineHeight: 21,
   },
 
   requirementMet: {
-    color: theme.colors.accent,
+    color:
+      theme.colors.accent,
   },
-
-  /* ------------------------------ Option Row ------------------------------ */
 
   optionRow: {
     flexDirection: "row",
     gap: 8,
-
     marginBottom: 24,
   },
 
   optionButton: {
     flex: 1,
-
     minHeight: 50,
-
     paddingHorizontal: 8,
-
     justifyContent: "center",
     alignItems: "center",
-
-    backgroundColor: "#FAFBF9",
-
+    backgroundColor:
+      "#FAFBF9",
     borderWidth: 1,
-    borderColor: "#D6DAD5",
-
-    borderRadius: theme.radius.md,
+    borderColor:
+      "#D6DAD5",
+    borderRadius:
+      theme.radius.md,
   },
 
   optionButtonActive: {
-    backgroundColor: theme.colors.accentSoft,
-    borderColor: theme.colors.accent,
+    backgroundColor:
+      theme.colors.accentSoft,
+    borderColor:
+      theme.colors.accent,
   },
 
   optionText: {
-    color: theme.colors.textSecondary,
-
+    color:
+      theme.colors.textSecondary,
     fontSize: 12,
     fontWeight: "600",
-
     textAlign: "center",
   },
 
   optionTextActive: {
-    color: theme.colors.accent,
+    color:
+      theme.colors.accent,
     fontWeight: "700",
   },
 
-  /* ------------------------------- Cycling -------------------------------- */
-
   lockedOption: {
     flexDirection: "row",
-
-    justifyContent: "space-between",
+    justifyContent:
+      "space-between",
     alignItems: "center",
-
     padding: 16,
-
     marginBottom: 24,
-
-    backgroundColor: "#FAFBF9",
-
+    backgroundColor:
+      "#FAFBF9",
     borderWidth: 1,
-    borderColor: "#D6DAD5",
-
-    borderRadius: theme.radius.md,
+    borderColor:
+      "#D6DAD5",
+    borderRadius:
+      theme.radius.md,
   },
 
   lockedOptionText: {
-    color: theme.colors.text,
-
+    color:
+      theme.colors.text,
     fontSize: 15,
     fontWeight: "700",
   },
 
   lockedOptionSubtext: {
-    color: theme.colors.textSecondary,
-
+    color:
+      theme.colors.textSecondary,
     fontSize: 12,
-
     marginTop: 3,
   },
 
   sportIndicator: {
     width: 28,
     height: 28,
-
     borderRadius: 14,
-
     alignItems: "center",
     justifyContent: "center",
-
-    backgroundColor: theme.colors.accentSoft,
+    backgroundColor:
+      theme.colors.accentSoft,
   },
 
   sportIndicatorText: {
-    color: theme.colors.accent,
-
+    color:
+      theme.colors.accent,
     fontSize: 13,
     fontWeight: "800",
   },
 
-  /* --------------------------- Training History --------------------------- */
-
   optionColumn: {
     gap: 8,
-
     marginBottom: 24,
   },
 
   historyOption: {
     padding: 15,
-
-    backgroundColor: "#FAFBF9",
-
+    backgroundColor:
+      "#FAFBF9",
     borderWidth: 1,
-    borderColor: "#D6DAD5",
-
-    borderRadius: theme.radius.md,
+    borderColor:
+      "#D6DAD5",
+    borderRadius:
+      theme.radius.md,
   },
 
   historyOptionActive: {
-    backgroundColor: theme.colors.accentSoft,
-    borderColor: theme.colors.accent,
+    backgroundColor:
+      theme.colors.accentSoft,
+    borderColor:
+      theme.colors.accent,
   },
 
   historyTitle: {
-    color: theme.colors.text,
-
+    color:
+      theme.colors.text,
     fontSize: 14,
     fontWeight: "700",
   },
 
   historyTitleActive: {
-    color: theme.colors.accent,
+    color:
+      theme.colors.accent,
   },
 
   historySubtitle: {
     marginTop: 3,
-
-    color: theme.colors.textSecondary,
-
+    color:
+      theme.colors.textSecondary,
     fontSize: 12,
   },
 
-  /* ---------------------------- Birthday Picker --------------------------- */
-
   dateButton: {
     minHeight: 56,
-
     flexDirection: "row",
-
     alignItems: "center",
-    justifyContent: "space-between",
-
-    paddingHorizontal: theme.spacing.md,
-
-    backgroundColor: "#FAFBF9",
-
+    justifyContent:
+      "space-between",
+    paddingHorizontal:
+      theme.spacing.md,
+    backgroundColor:
+      "#FAFBF9",
     borderWidth: 1.5,
-    borderColor: "#D6DAD5",
-
-    borderRadius: theme.radius.md,
+    borderColor:
+      "#D6DAD5",
+    borderRadius:
+      theme.radius.md,
   },
 
   dateButtonText: {
-    color: theme.colors.text,
+    color:
+      theme.colors.text,
     fontSize: 16,
   },
 
@@ -1873,60 +2717,53 @@ const styles = StyleSheet.create({
   },
 
   dateIcon: {
-    color: theme.colors.accent,
-
+    color:
+      theme.colors.accent,
     fontSize: 16,
   },
 
   datePickerContainer: {
     marginTop: 8,
-
     padding: 10,
-
-    backgroundColor: theme.colors.surface,
-
+    backgroundColor:
+      theme.colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-
-    borderRadius: theme.radius.md,
+    borderColor:
+      theme.colors.border,
+    borderRadius:
+      theme.radius.md,
   },
 
   dateDoneButton: {
     alignSelf: "flex-end",
-
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
 
   dateDoneText: {
-    color: theme.colors.accent,
-
+    color:
+      theme.colors.accent,
     fontSize: 14,
     fontWeight: "700",
   },
 
-  /* ------------------------------- Info Box ------------------------------- */
-
   infoBox: {
     flexDirection: "row",
-
     padding: 18,
-
     marginBottom: 20,
-
-    backgroundColor: theme.colors.accentSoft,
-
-    borderRadius: theme.radius.md,
+    backgroundColor:
+      theme.colors.accentSoft,
+    borderRadius:
+      theme.radius.md,
   },
 
   infoMarker: {
     width: 3,
-
     marginRight: 14,
-
-    borderRadius: theme.radius.pill,
-
-    backgroundColor: theme.colors.accent,
+    borderRadius:
+      theme.radius.pill,
+    backgroundColor:
+      theme.colors.accent,
   },
 
   infoContent: {
@@ -1934,44 +2771,38 @@ const styles = StyleSheet.create({
   },
 
   infoTitle: {
-    color: theme.colors.accent,
-
+    color:
+      theme.colors.accent,
     fontSize: 12,
     fontWeight: "700",
-
     letterSpacing: 0.3,
-
     marginBottom: 5,
   },
 
   infoText: {
-    color: theme.colors.textSecondary,
-
+    color:
+      theme.colors.textSecondary,
     fontSize: 13,
     lineHeight: 20,
   },
 
-  /* ------------------------------- Power ---------------------------------- */
-
   powerCard: {
     padding: 18,
-
     marginBottom: 12,
-
-    backgroundColor: "#FAFBF9",
-
+    backgroundColor:
+      "#FAFBF9",
     borderWidth: 1,
-    borderColor: "#D6DAD5",
-
-    borderRadius: theme.radius.md,
+    borderColor:
+      "#D6DAD5",
+    borderRadius:
+      theme.radius.md,
   },
 
   powerCardTop: {
     flexDirection: "row",
-
-    justifyContent: "space-between",
+    justifyContent:
+      "space-between",
     alignItems: "flex-start",
-
     gap: 12,
   },
 
@@ -1980,69 +2811,61 @@ const styles = StyleSheet.create({
   },
 
   powerLabel: {
-    color: theme.colors.text,
-
+    color:
+      theme.colors.text,
     fontSize: 12,
     fontWeight: "700",
-
     letterSpacing: 0.8,
   },
 
   powerDescription: {
-    color: theme.colors.textSecondary,
-
+    color:
+      theme.colors.textSecondary,
     fontSize: 12,
-
     marginTop: 4,
   },
 
   wkgPill: {
     paddingHorizontal: 10,
     paddingVertical: 6,
-
-    backgroundColor: theme.colors.accentSoft,
-
-    borderRadius: theme.radius.pill,
+    backgroundColor:
+      theme.colors.accentSoft,
+    borderRadius:
+      theme.radius.pill,
   },
 
   wkg: {
-    color: theme.colors.accent,
-
+    color:
+      theme.colors.accent,
     fontSize: 12,
     fontWeight: "700",
   },
 
   powerInputWrapper: {
     marginTop: 16,
-
     flexDirection: "row",
     alignItems: "baseline",
   },
 
   powerInput: {
     flex: 1,
-
-    color: theme.colors.text,
-
+    color:
+      theme.colors.text,
     fontSize: 30,
     fontWeight: "700",
-
     paddingVertical: 0,
   },
 
   powerUnit: {
-    color: theme.colors.textSecondary,
-
+    color:
+      theme.colors.textSecondary,
     fontSize: 15,
     fontWeight: "600",
   },
 
-  /* ------------------------------- Checkbox ------------------------------- */
-
   checkboxRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-
     marginTop: 12,
     marginBottom: 4,
   },
@@ -2050,55 +2873,48 @@ const styles = StyleSheet.create({
   checkbox: {
     width: 22,
     height: 22,
-
     marginRight: 11,
-
     alignItems: "center",
     justifyContent: "center",
-
-    backgroundColor: theme.colors.surface,
-
+    backgroundColor:
+      theme.colors.surface,
     borderWidth: 1,
-    borderColor: "#D6DAD5",
-
+    borderColor:
+      "#D6DAD5",
     borderRadius: 6,
   },
 
   checkboxChecked: {
-    backgroundColor: theme.colors.accent,
-    borderColor: theme.colors.accent,
+    backgroundColor:
+      theme.colors.accent,
+    borderColor:
+      theme.colors.accent,
   },
 
   checkmark: {
-    color: theme.colors.white,
-
+    color:
+      theme.colors.white,
     fontWeight: "900",
   },
 
   checkboxText: {
     flex: 1,
-
-    color: theme.colors.textSecondary,
-
+    color:
+      theme.colors.textSecondary,
     fontSize: 12,
     lineHeight: 18,
   },
 
-  /* -------------------------------- Buttons ------------------------------- */
-
   primaryButton: {
     minHeight: 56,
-
     justifyContent: "center",
     alignItems: "center",
-
     paddingHorizontal: 20,
-
     marginTop: 12,
-
-    backgroundColor: theme.colors.accent,
-
-    borderRadius: theme.radius.md,
+    backgroundColor:
+      theme.colors.accent,
+    borderRadius:
+      theme.radius.md,
   },
 
   primaryButtonPressed: {
@@ -2106,12 +2922,13 @@ const styles = StyleSheet.create({
   },
 
   primaryButtonDisabled: {
-    backgroundColor: "#D7DAD7",
+    backgroundColor:
+      "#D7DAD7",
   },
 
   primaryButtonText: {
-    color: theme.colors.text,
-
+    color:
+      theme.colors.text,
     fontSize: 15,
     fontWeight: "700",
   },
@@ -2123,9 +2940,7 @@ const styles = StyleSheet.create({
   navigationRow: {
     flexDirection: "row",
     alignItems: "center",
-
     gap: 12,
-
     marginTop: 14,
   },
 
@@ -2135,17 +2950,14 @@ const styles = StyleSheet.create({
 
   secondaryButton: {
     minHeight: 56,
-
     justifyContent: "center",
-
     paddingHorizontal: 12,
-
     marginTop: 12,
   },
 
   secondaryButtonText: {
-    color: theme.colors.textSecondary,
-
+    color:
+      theme.colors.textSecondary,
     fontSize: 14,
     fontWeight: "600",
   },

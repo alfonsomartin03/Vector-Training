@@ -3,6 +3,7 @@ import {
     AthleteProfile,
     PowerProfile,
 } from "../types/athlete";
+
 import { supabase } from "./supabase";
 
 export async function getAthleteData(
@@ -31,7 +32,7 @@ export async function getAthleteData(
   /*
    * Load the most recent power profile.
    *
-   * This is deliberately ordered by recorded_at because your
+   * This is deliberately ordered by recorded_at because the
    * schema allows multiple power profiles for the same athlete.
    */
   const {
@@ -55,4 +56,36 @@ export async function getAthleteData(
     profile: profile as AthleteProfile,
     powerProfile: powerProfile as PowerProfile | null,
   };
+}
+
+export type PowerProfileUpdate = {
+  one_minute_watts: number;
+  five_minute_watts: number;
+  twelve_minute_watts: number;
+};
+
+export async function updatePowerProfile(
+  userId: string,
+  values: PowerProfileUpdate
+): Promise<PowerProfile> {
+  const { data, error } = await supabase
+    .from("power_profiles")
+    .insert({
+      user_id: userId,
+      one_minute_watts: values.one_minute_watts,
+      five_minute_watts: values.five_minute_watts,
+      twelve_minute_watts: values.twelve_minute_watts,
+      maximal_efforts_confirmed: true,
+      recorded_at: new Date().toISOString(),
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(
+      `Unable to update power profile: ${error.message}`
+    );
+  }
+
+  return data as PowerProfile;
 }

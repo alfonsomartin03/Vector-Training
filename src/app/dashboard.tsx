@@ -1,140 +1,363 @@
 import {
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    useWindowDimensions,
-    View,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
 } from "react-native";
 
 import { router } from "expo-router";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
 import { theme } from "../constants/theme";
+import { useAuth } from "../context/AuthContext";
+
+import { getAthleteData } from "../lib/athlete";
+import { buildAthleteModel } from "../lib/physiology/athleteModel";
+
+import type { AthleteData } from "../types/athlete";
 
 export default function DashboardPage() {
   const { width } = useWindowDimensions();
+  const { user } = useAuth();
+
   const isMobile = width < 700;
+
+  const [athlete, setAthlete] =
+    useState<AthleteData | null>(null);
+
+  const [isLoading, setIsLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      setAthlete(null);
+      setIsLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    async function loadAthlete() {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const athleteData =
+          await getAthleteData(user!.id);
+
+        if (isMounted) {
+          setAthlete(athleteData);
+        }
+      } catch (loadError) {
+        console.error(
+          "Failed to load dashboard athlete:",
+          loadError
+        );
+
+        if (isMounted) {
+          setError(
+            "Unable to load your athlete profile."
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadAthlete();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  const model = useMemo(() => {
+    if (!athlete) {
+      return null;
+    }
+
+    return buildAthleteModel(athlete);
+  }, [athlete]);
+
+  const profile = athlete?.profile;
+
+  const firstName =
+    profile?.first_name?.trim() || "Athlete";
+
+  const firstInitial =
+    firstName.charAt(0).toUpperCase();
+
+  const greeting = getGreeting();
+
+  const lastUpdated =
+    formatRecordedDate(
+      model?.recordedAt ?? null
+    );
+
+  const cpWattsPerKg =
+    model
+      ? model.cpWatts /
+        model.inputs.weightKg
+      : null;
 
   return (
     <View style={styles.page}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={
+          styles.scrollContent
+        }
       >
         <View
           style={[
             styles.container,
-            isMobile ? styles.containerMobile : undefined,
+            isMobile
+              ? styles.containerMobile
+              : undefined,
           ]}
         >
           {/* HEADER */}
           <View style={styles.header}>
-            <Pressable onPress={() => router.push("/")}>
-            <Text style={styles.logo}>VECTOR</Text>
+            <Pressable
+              onPress={() =>
+                router.push("/")
+              }
+            >
+              <Text style={styles.logo}>
+                VECTOR
+              </Text>
             </Pressable>
 
-            <View style={styles.profileCircle}>
-              <Text style={styles.profileInitial}>A</Text>
-            </View>
+            <Pressable
+              style={styles.profileCircle}
+              onPress={() =>
+                router.push("/profile")
+              }
+            >
+              <Text
+                style={styles.profileInitial}
+              >
+                {firstInitial}
+              </Text>
+            </Pressable>
           </View>
 
           {/* WELCOME */}
           <View style={styles.welcome}>
-            <Text style={styles.welcomeOverline}>GOOD AFTERNOON</Text>
-
-            <Text style={styles.welcomeTitle}>
-              Welcome back, User.
+            <Text
+              style={styles.welcomeOverline}
+            >
+              {greeting}
             </Text>
 
-            <Text style={styles.welcomeSubtitle}>
-              Your fitness is moving in the right direction.
+            <Text
+              style={styles.welcomeTitle}
+            >
+              Welcome back, {firstName}.
+            </Text>
+
+            <Text
+              style={styles.welcomeSubtitle}
+            >
+              {isLoading
+                ? "Loading your current physiology."
+                : model
+                  ? "Your current physiology model is ready."
+                  : "Add maximal power efforts to build your physiology model."}
             </Text>
           </View>
+
+          {error ? (
+            <View style={styles.errorCard}>
+              <Text style={styles.errorText}>
+                {error}
+              </Text>
+            </View>
+          ) : null}
 
           {/* PROFILE HEADER */}
           <View style={styles.sectionHeader}>
             <View>
-              <Text style={styles.sectionOverline}>
+              <Text
+                style={styles.sectionOverline}
+              >
                 CURRENT PROFILE
               </Text>
 
-              <Text style={styles.sectionTitle}>
+              <Text
+                style={styles.sectionTitle}
+              >
                 Your physiology
               </Text>
             </View>
 
-            <View style={styles.updatedPill}>
-              <View style={styles.updatedDot} />
-              <Text style={styles.updatedText}>Updated today</Text>
-            </View>
+            {model ? (
+              <View style={styles.updatedPill}>
+                <View
+                  style={styles.updatedDot}
+                />
+
+                <Text
+                  style={styles.updatedText}
+                >
+                  {lastUpdated}
+                </Text>
+              </View>
+            ) : null}
           </View>
 
           {/* METRICS */}
           <View
             style={[
               styles.metricsGrid,
-              isMobile ? styles.metricsGridMobile : undefined,
+              isMobile
+                ? styles.metricsGridMobile
+                : undefined,
             ]}
           >
             <MetricCard
               label="Critical Power"
-              value="291"
+              value={
+                isLoading
+                  ? "..."
+                  : model
+                    ? `${Math.round(
+                        model.cpWatts
+                      )}`
+                    : "—"
+              }
               unit="W"
-              trend="+2.4%"
-              trendLabel="30 days"
-              bars={[42, 44, 43, 48, 52, 57, 61, 66]}
+              secondary={
+                cpWattsPerKg != null
+                  ? `${cpWattsPerKg.toFixed(
+                      2
+                    )} W/kg`
+                  : undefined
+              }
+              onPress={() =>
+                router.push("/power")
+              }
             />
 
             <MetricCard
               label="W′"
-              value="18.7"
+              value={
+                isLoading
+                  ? "..."
+                  : model
+                    ? model.wPrimeKj.toFixed(
+                        1
+                      )
+                    : "—"
+              }
               unit="kJ"
-              trend="+0.8%"
-              trendLabel="30 days"
-              bars={[54, 51, 53, 55, 56, 58, 59, 61]}
+              secondary={
+                model
+                  ? "Anaerobic work capacity"
+                  : undefined
+              }
+              onPress={() =>
+                router.push("/power")
+              }
             />
 
             <MetricCard
               label="Est. VO₂max"
-              value="64.1"
+              value={
+                isLoading
+                  ? "..."
+                  : model
+                    ? model.vo2Max.toFixed(1)
+                    : "—"
+              }
               unit=""
-              trend="+1.3"
-              trendLabel="30 days"
-              bars={[44, 45, 48, 47, 51, 54, 56, 59]}
+              secondary={
+                model
+                  ? "mL/kg/min"
+                  : undefined
+              }
+              onPress={() =>
+                router.push("/power")
+              }
             />
           </View>
 
-          {/* CURRENT DIRECTION */}
+          {/* MODEL STATUS */}
           <View style={styles.directionCard}>
             <View style={styles.directionTop}>
-              <View>
-                <Text style={styles.directionOverline}>
-                  CURRENT DIRECTION
+              <View style={styles.directionHeading}>
+                <Text
+                  style={
+                    styles.directionOverline
+                  }
+                >
+                  VECTOR MODEL
                 </Text>
 
-                <Text style={styles.directionTitle}>
-                  Aerobic development
+                <Text
+                  style={styles.directionTitle}
+                >
+                  {model
+                    ? "Current profile"
+                    : "Profile incomplete"}
                 </Text>
               </View>
 
-              <View style={styles.directionIcon}>
-                <Text style={styles.directionArrow}>↗</Text>
+              <View
+                style={styles.directionIcon}
+              >
+                <Text
+                  style={styles.directionArrow}
+                >
+                  {model ? "↗" : "—"}
+                </Text>
               </View>
             </View>
 
-            <Text style={styles.directionDescription}>
-              Your aerobic ceiling is currently the strongest
-              opportunity for improvement. Vector is prioritizing
-              training that raises sustainable aerobic power while
-              preserving your anaerobic capacity.
+            <Text
+              style={
+                styles.directionDescription
+              }
+            >
+              {model
+                ? `Vector currently estimates your Critical Power at ${Math.round(
+                    model.cpWatts
+                  )} W with ${model.wPrimeKj.toFixed(
+                    1
+                  )} kJ of W′. Your physiology model is derived from your recorded maximal power efforts.`
+                : "Vector needs valid maximal power efforts before it can construct your physiology model."}
             </Text>
 
-            <View style={styles.directionFooter}>
-              <Text style={styles.directionFooterLabel}>
-                Training focus
+            <View
+              style={styles.directionFooter}
+            >
+              <Text
+                style={
+                  styles.directionFooterLabel
+                }
+              >
+                Model
               </Text>
 
-              <Text style={styles.directionFooterValue}>
-                VO₂ development + aerobic volume
+              <Text
+                style={
+                  styles.directionFooterValue
+                }
+              >
+                {model
+                  ? "Morton 3-parameter power-duration model"
+                  : "Waiting for power data"}
               </Text>
             </View>
           </View>
@@ -142,182 +365,155 @@ export default function DashboardPage() {
           {/* TRAINING HEADER */}
           <View style={styles.trainingHeader}>
             <View>
-              <Text style={styles.sectionOverline}>TRAINING</Text>
+              <Text
+                style={styles.sectionOverline}
+              >
+                TRAINING
+              </Text>
 
-              <Text style={styles.sectionTitle}>
+              <Text
+                style={styles.sectionTitle}
+              >
                 What's next
               </Text>
             </View>
 
-            <Pressable onPress={() => {}}>
+            <Pressable
+              onPress={() =>
+                router.push("/training")
+              }
+            >
               <Text style={styles.viewWeek}>
-                View week →
+                View training →
               </Text>
             </Pressable>
           </View>
 
-          {/* WORKOUTS */}
-          <View style={styles.workouts}>
-            <Pressable
-              style={styles.todayWorkout}
-              onPress={() => {}}
+          {/* TRAINING PLACEHOLDER */}
+          <View style={styles.trainingCard}>
+            <View style={styles.trainingIcon}>
+              <Text
+                style={
+                  styles.trainingIconText
+                }
+              >
+                ↗
+              </Text>
+            </View>
+
+            <View
+              style={styles.trainingContent}
             >
-              <View style={styles.workoutDateColumn}>
-                <Text style={styles.workoutDay}>TODAY</Text>
-                <Text style={styles.workoutDate}>08</Text>
-              </View>
+              <Text
+                style={
+                  styles.trainingCardOverline
+                }
+              >
+                TRAINING ENGINE
+              </Text>
 
-              <View style={styles.workoutDivider} />
+              <Text
+                style={styles.trainingCardTitle}
+              >
+                Training recommendations
+              </Text>
 
-              <View style={styles.workoutMain}>
-                <View style={styles.workoutTop}>
-                  <View>
-                    <Text style={styles.workoutType}>
-                      AEROBIC DEVELOPMENT
-                    </Text>
+              <Text
+                style={
+                  styles.trainingCardDescription
+                }
+              >
+                Your physiology data will be
+                used to build individualized
+                training once your training
+                model is configured.
+              </Text>
 
-                    <Text style={styles.workoutTitle}>
-                      5 × 4 min VO₂
-                    </Text>
-                  </View>
-
-                  <View style={styles.priorityPill}>
-                    <Text style={styles.priorityText}>
-                      Key session
-                    </Text>
-                  </View>
-                </View>
-
-                <Text style={styles.workoutDescription}>
-                  Five controlled severe-domain efforts designed
-                  to accumulate time near maximal aerobic uptake.
+              <Pressable
+                style={
+                  styles.trainingButton
+                }
+                onPress={() =>
+                  router.push("/training")
+                }
+              >
+                <Text
+                  style={
+                    styles.trainingButtonText
+                  }
+                >
+                  View training
                 </Text>
 
-                <View style={styles.workoutStats}>
-                  <WorkoutStat
-                    label="Duration"
-                    value="1h 20m"
-                  />
-
-                  <WorkoutStat
-                    label="Work"
-                    value="5 × 4m"
-                  />
-
-                  <WorkoutStat
-                    label="Target"
-                    value="340–355 W"
-                  />
-                </View>
-
-                <View style={styles.intervalPreview}>
-                  <IntervalBlock width={34} height={18} />
-
-                  <IntervalBlock
-                    width={10}
-                    height={8}
-                    recovery
-                  />
-
-                  <IntervalBlock width={24} height={40} />
-
-                  <IntervalBlock
-                    width={10}
-                    height={8}
-                    recovery
-                  />
-
-                  <IntervalBlock width={24} height={40} />
-
-                  <IntervalBlock
-                    width={10}
-                    height={8}
-                    recovery
-                  />
-
-                  <IntervalBlock width={24} height={40} />
-
-                  <IntervalBlock
-                    width={10}
-                    height={8}
-                    recovery
-                  />
-
-                  <IntervalBlock width={24} height={40} />
-
-                  <IntervalBlock
-                    width={10}
-                    height={8}
-                    recovery
-                  />
-
-                  <IntervalBlock width={24} height={40} />
-
-                  <IntervalBlock width={44} height={16} />
-                </View>
-              </View>
-
-              <Text style={styles.workoutArrow}>→</Text>
-            </Pressable>
-
-            {/* TOMORROW */}
-            <View style={styles.tomorrowWorkout}>
-              <View style={styles.workoutDateColumn}>
-                <Text style={styles.tomorrowDay}>
-                  TOMORROW
+                <Text
+                  style={
+                    styles.trainingButtonArrow
+                  }
+                >
+                  →
                 </Text>
-
-                <Text style={styles.tomorrowDate}>09</Text>
-              </View>
-
-              <View style={styles.workoutDivider} />
-
-              <View style={styles.restMain}>
-                <Text style={styles.restLabel}>
-                  RECOVERY
-                </Text>
-
-                <Text style={styles.restTitle}>
-                  Rest day
-                </Text>
-
-                <Text style={styles.restDescription}>
-                  No structured training. Let today's work turn
-                  into adaptation.
-                </Text>
-              </View>
-
-              <View style={styles.restCircle}>
-                <Text style={styles.restSymbol}>—</Text>
-              </View>
+              </Pressable>
             </View>
           </View>
 
           {/* VECTOR INSIGHT */}
           <View style={styles.insight}>
-            <View style={styles.insightMarker} />
+            <View
+              style={styles.insightMarker}
+            />
 
-            <View style={styles.insightContent}>
-              <Text style={styles.insightOverline}>
+            <View
+              style={styles.insightContent}
+            >
+              <Text
+                style={
+                  styles.insightOverline
+                }
+              >
                 VECTOR INSIGHT
               </Text>
 
-              <Text style={styles.insightText}>
-                Your Critical Power has risen approximately{" "}
-                <Text style={styles.insightHighlight}>7 W</Text>{" "}
-                over the last 30 days while W′ has remained
-                stable — a useful sign that aerobic development
-                is occurring without sacrificing high-intensity
-                capacity.
+              <Text
+                style={styles.insightText}
+              >
+                {model ? (
+                  <>
+                    Your current model estimates{" "}
+                    <Text
+                      style={
+                        styles.insightHighlight
+                      }
+                    >
+                      {Math.round(
+                        model.cpWatts
+                      )} W
+                    </Text>{" "}
+                    of Critical Power and{" "}
+                    <Text
+                      style={
+                        styles.insightHighlight
+                      }
+                    >
+                      {model.wPrimeKj.toFixed(
+                        1
+                      )} kJ
+                    </Text>{" "}
+                    of W′. As Vector collects
+                    historical profiles, this
+                    area can identify meaningful
+                    changes in your physiology.
+                  </>
+                ) : (
+                  "Add valid power data to begin building your Vector physiology profile."
+                )}
               </Text>
             </View>
           </View>
         </View>
       </ScrollView>
 
-    <BottomNav active="home"/>
+      <BottomNav active="home" />
     </View>
- 
   );
 }
 
@@ -329,25 +525,40 @@ type MetricCardProps = {
   label: string;
   value: string;
   unit: string;
-  trend: string;
-  trendLabel: string;
-  bars: number[];
+  secondary?: string;
+  onPress?: () => void;
 };
 
 function MetricCard({
   label,
   value,
   unit,
-  trend,
-  trendLabel,
-  bars,
+  secondary,
+  onPress,
 }: MetricCardProps) {
   return (
-    <View style={styles.metricCard}>
-      <Text style={styles.metricLabel}>{label}</Text>
+    <Pressable
+      style={styles.metricCard}
+      onPress={onPress}
+    >
+      <View
+        style={styles.metricCardHeader}
+      >
+        <Text style={styles.metricLabel}>
+          {label}
+        </Text>
 
-      <View style={styles.metricValueRow}>
-        <Text style={styles.metricValue}>{value}</Text>
+        <Text style={styles.metricArrow}>
+          →
+        </Text>
+      </View>
+
+      <View
+        style={styles.metricValueRow}
+      >
+        <Text style={styles.metricValue}>
+          {value}
+        </Text>
 
         {unit ? (
           <Text style={styles.metricUnit}>
@@ -356,79 +567,18 @@ function MetricCard({
         ) : null}
       </View>
 
-      <View style={styles.metricTrendRow}>
-        <Text style={styles.metricTrend}>
-          ↑ {trend}
-        </Text>
-
-        <Text style={styles.metricTrendPeriod}>
-          {trendLabel}
-        </Text>
-      </View>
-
-      <View style={styles.miniChart}>
-        {bars.map((height, index) => (
-          <View
-            key={index}
-            style={[
-              styles.miniBar,
-              {
-                height,
-              },
-            ]}
-          />
-        ))}
-      </View>
-    </View>
-  );
-}
-
-type WorkoutStatProps = {
-  label: string;
-  value: string;
-};
-
-function WorkoutStat({
-  label,
-  value,
-}: WorkoutStatProps) {
-  return (
-    <View>
-      <Text style={styles.workoutStatLabel}>
-        {label}
+      <Text
+        style={styles.metricSecondary}
+      >
+        {secondary ?? "Current estimate"}
       </Text>
 
-      <Text style={styles.workoutStatValue}>
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-type IntervalBlockProps = {
-  width: number;
-  height: number;
-  recovery?: boolean;
-};
-
-function IntervalBlock({
-  width,
-  height,
-  recovery,
-}: IntervalBlockProps) {
-  return (
-    <View
-      style={[
-        styles.intervalBlock,
-        recovery
-          ? styles.intervalRecovery
-          : undefined,
-        {
-          width,
-          height,
-        },
-      ]}
-    />
+      <View style={styles.metricLine}>
+        <View
+          style={styles.metricLineAccent}
+        />
+      </View>
+    </Pressable>
   );
 }
 
@@ -452,28 +602,40 @@ function BottomNav({
           symbol="⌂"
           label="Home"
           active={active === "home"}
-          onPress={() => router.push("/dashboard")}
+          onPress={() =>
+            router.push("/dashboard")
+          }
         />
 
         <Nav
           symbol="⌁"
           label="Training"
-          active={active === "training"}
-          onPress={() => router.push("/training")}
+          active={
+            active === "training"
+          }
+          onPress={() =>
+            router.push("/training")
+          }
         />
 
         <Nav
           symbol="↗"
           label="Power"
           active={active === "power"}
-          onPress={() => router.push("/power")}
+          onPress={() =>
+            router.push("/power")
+          }
         />
 
         <Nav
           symbol="○"
           label="Profile"
-          active={active === "profile"}
-          onPress={() => router.push("/profile")}
+          active={
+            active === "profile"
+          }
+          onPress={() =>
+            router.push("/profile")
+          }
         />
       </View>
     </View>
@@ -497,14 +659,18 @@ function Nav({
     <Pressable
       style={[
         styles.navItem,
-        active ? styles.navItemActive : undefined,
+        active
+          ? styles.navItemActive
+          : undefined,
       ]}
       onPress={onPress}
     >
       <Text
         style={[
           styles.navSymbol,
-          active ? styles.navSymbolActive : undefined,
+          active
+            ? styles.navSymbolActive
+            : undefined,
         ]}
       >
         {symbol}
@@ -513,13 +679,65 @@ function Nav({
       <Text
         style={[
           styles.navLabel,
-          active ? styles.navLabelActive : undefined,
+          active
+            ? styles.navLabelActive
+            : undefined,
         ]}
       >
         {label}
       </Text>
     </Pressable>
   );
+}
+
+function getGreeting() {
+  const hour = new Date().getHours();
+
+  if (hour < 12) {
+    return "GOOD MORNING";
+  }
+
+  if (hour < 18) {
+    return "GOOD AFTERNOON";
+  }
+
+  return "GOOD EVENING";
+}
+
+function formatRecordedDate(
+  recordedAt: string | null
+) {
+  if (!recordedAt) {
+    return "Current";
+  }
+
+  const date = new Date(recordedAt);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Current";
+  }
+
+  const today = new Date();
+
+  const isToday =
+    date.getFullYear() ===
+      today.getFullYear() &&
+    date.getMonth() ===
+      today.getMonth() &&
+    date.getDate() ===
+      today.getDate();
+
+  if (isToday) {
+    return "Updated today";
+  }
+
+  return `Updated ${date.toLocaleDateString(
+    undefined,
+    {
+      month: "short",
+      day: "numeric",
+    }
+  )}`;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -529,7 +747,8 @@ function Nav({
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor:
+      theme.colors.background,
   },
 
   scrollContent: {
@@ -567,7 +786,8 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.surface,
+    backgroundColor:
+      theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
@@ -600,9 +820,22 @@ const styles = StyleSheet.create({
   },
 
   welcomeSubtitle: {
-    color: theme.colors.textSecondary,
+    color:
+      theme.colors.textSecondary,
     fontSize: 17,
     marginTop: 12,
+  },
+
+  errorCard: {
+    backgroundColor: "#FDECEC",
+    borderRadius: theme.radius.md,
+    padding: 14,
+    marginBottom: 24,
+  },
+
+  errorText: {
+    color: "#A64E4E",
+    fontSize: 12,
   },
 
   sectionHeader: {
@@ -613,7 +846,8 @@ const styles = StyleSheet.create({
   },
 
   sectionOverline: {
-    color: theme.colors.textSecondary,
+    color:
+      theme.colors.textSecondary,
     fontSize: 10,
     fontWeight: "700",
     letterSpacing: 1.4,
@@ -634,7 +868,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     paddingVertical: 7,
     borderRadius: 999,
-    backgroundColor: theme.colors.surface,
+    backgroundColor:
+      theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
@@ -643,11 +878,13 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: theme.colors.accent,
+    backgroundColor:
+      theme.colors.accent,
   },
 
   updatedText: {
-    color: theme.colors.textSecondary,
+    color:
+      theme.colors.textSecondary,
     fontSize: 11,
   },
 
@@ -662,17 +899,30 @@ const styles = StyleSheet.create({
 
   metricCard: {
     flex: 1,
-    minHeight: 205,
+    minHeight: 190,
     padding: 22,
     borderRadius: 20,
-    backgroundColor: theme.colors.surface,
+    backgroundColor:
+      theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
 
+  metricCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
   metricLabel: {
-    color: theme.colors.textSecondary,
+    color:
+      theme.colors.textSecondary,
     fontSize: 12,
+  },
+
+  metricArrow: {
+    color: theme.colors.accent,
+    fontSize: 16,
   },
 
   metricValueRow: {
@@ -690,58 +940,53 @@ const styles = StyleSheet.create({
 
   metricUnit: {
     marginLeft: 5,
-    color: theme.colors.textSecondary,
+    color:
+      theme.colors.textSecondary,
     fontSize: 14,
     fontWeight: "500",
   },
 
-  metricTrendRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+  metricSecondary: {
+    color:
+      theme.colors.textSecondary,
+    fontSize: 11,
     marginTop: 5,
   },
 
-  metricTrend: {
-    color: theme.colors.accent,
-    fontSize: 12,
-    fontWeight: "600",
+  metricLine: {
+    height: 4,
+    marginTop: 24,
+    borderRadius: 999,
+    backgroundColor:
+      theme.colors.accentSoft,
+    overflow: "hidden",
   },
 
-  metricTrendPeriod: {
-    color: theme.colors.textSecondary,
-    fontSize: 11,
-  },
-
-  miniChart: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 5,
-    marginTop: 20,
-  },
-
-  miniBar: {
-    flex: 1,
-    minWidth: 6,
-    maxWidth: 18,
-    borderRadius: 4,
-    backgroundColor: theme.colors.accentSoft,
-    borderTopWidth: 2,
-    borderTopColor: theme.colors.accent,
+  metricLineAccent: {
+    width: "34%",
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor:
+      theme.colors.accent,
   },
 
   directionCard: {
     marginTop: 18,
     padding: 28,
     borderRadius: 22,
-    backgroundColor: theme.colors.text,
+    backgroundColor:
+      theme.colors.text,
   },
 
   directionTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
+  },
+
+  directionHeading: {
+    flex: 1,
+    paddingRight: 20,
   },
 
   directionOverline: {
@@ -816,195 +1061,78 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  workouts: {
-    gap: 12,
-  },
-
-  todayWorkout: {
-    minHeight: 210,
+  trainingCard: {
+    minHeight: 190,
     flexDirection: "row",
-    alignItems: "stretch",
-    padding: 24,
+    padding: 26,
     borderRadius: 22,
-    backgroundColor: theme.colors.surface,
+    backgroundColor:
+      theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
 
-  tomorrowWorkout: {
-    minHeight: 145,
-    flexDirection: "row",
+  trainingIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: "center",
-    padding: 24,
-    borderRadius: 22,
-    backgroundColor: "#F1F2F0",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    justifyContent: "center",
+    backgroundColor:
+      theme.colors.accentSoft,
+    marginRight: 20,
   },
 
-  workoutDateColumn: {
-    width: 72,
-  },
-
-  workoutDay: {
+  trainingIconText: {
     color: theme.colors.accent,
-    fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 1,
+    fontSize: 21,
   },
 
-  tomorrowDay: {
-    color: theme.colors.textSecondary,
-    fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 1,
-  },
-
-  workoutDate: {
-    color: theme.colors.text,
-    fontSize: 34,
-    fontWeight: "600",
-    marginTop: 6,
-  },
-
-  tomorrowDate: {
-    color: theme.colors.textSecondary,
-    fontSize: 34,
-    fontWeight: "600",
-    marginTop: 6,
-  },
-
-  workoutDivider: {
-    width: 1,
-    marginRight: 24,
-    backgroundColor: theme.colors.border,
-  },
-
-  workoutMain: {
+  trainingContent: {
     flex: 1,
   },
 
-  workoutTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-
-  workoutType: {
-    color: theme.colors.textSecondary,
-    fontSize: 10,
+  trainingCardOverline: {
+    color:
+      theme.colors.textSecondary,
+    fontSize: 9,
     fontWeight: "700",
     letterSpacing: 1,
   },
 
-  workoutTitle: {
+  trainingCardTitle: {
     color: theme.colors.text,
-    fontSize: 23,
+    fontSize: 22,
     fontWeight: "600",
     marginTop: 5,
   },
 
-  priorityPill: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: theme.colors.accentSoft,
-  },
-
-  priorityText: {
-    color: theme.colors.accent,
-    fontSize: 10,
-    fontWeight: "700",
-  },
-
-  workoutDescription: {
-    color: theme.colors.textSecondary,
+  trainingCardDescription: {
+    color:
+      theme.colors.textSecondary,
     fontSize: 13,
     lineHeight: 20,
-    marginTop: 10,
+    marginTop: 9,
     maxWidth: 620,
   },
 
-  workoutStats: {
+  trainingButton: {
+    alignSelf: "flex-start",
     flexDirection: "row",
-    gap: 36,
+    alignItems: "center",
+    gap: 8,
     marginTop: 18,
   },
 
-  workoutStatLabel: {
-    color: theme.colors.textSecondary,
-    fontSize: 9,
-    textTransform: "uppercase",
-    letterSpacing: 0.7,
-  },
-
-  workoutStatValue: {
-    color: theme.colors.text,
-    fontSize: 13,
-    fontWeight: "600",
-    marginTop: 3,
-  },
-
-  intervalPreview: {
-    height: 44,
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 3,
-    marginTop: 22,
-  },
-
-  intervalBlock: {
-    borderRadius: 3,
-    backgroundColor: theme.colors.accent,
-  },
-
-  intervalRecovery: {
-    backgroundColor: theme.colors.accentSoft,
-  },
-
-  workoutArrow: {
-    alignSelf: "center",
-    marginLeft: 18,
+  trainingButtonText: {
     color: theme.colors.accent,
-    fontSize: 24,
-  },
-
-  restMain: {
-    flex: 1,
-  },
-
-  restLabel: {
-    color: theme.colors.textSecondary,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: "700",
-    letterSpacing: 1,
   },
 
-  restTitle: {
-    color: theme.colors.text,
-    fontSize: 21,
-    fontWeight: "600",
-    marginTop: 5,
-  },
-
-  restDescription: {
-    color: theme.colors.textSecondary,
-    fontSize: 13,
-    marginTop: 7,
-  },
-
-  restCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: theme.colors.surface,
-  },
-
-  restSymbol: {
-    color: theme.colors.textSecondary,
-    fontSize: 16,
+  trainingButtonArrow: {
+    color: theme.colors.accent,
+    fontSize: 17,
   },
 
   insight: {
@@ -1012,13 +1140,15 @@ const styles = StyleSheet.create({
     marginTop: 22,
     padding: 24,
     borderRadius: 18,
-    backgroundColor: theme.colors.accentSoft,
+    backgroundColor:
+      theme.colors.accentSoft,
   },
 
   insightMarker: {
     width: 3,
     borderRadius: 999,
-    backgroundColor: theme.colors.accent,
+    backgroundColor:
+      theme.colors.accent,
     marginRight: 18,
   },
 
@@ -1035,7 +1165,8 @@ const styles = StyleSheet.create({
 
   insightText: {
     marginTop: 7,
-    color: theme.colors.textSecondary,
+    color:
+      theme.colors.textSecondary,
     fontSize: 13,
     lineHeight: 21,
   },
@@ -1086,11 +1217,13 @@ const styles = StyleSheet.create({
   },
 
   navItemActive: {
-    backgroundColor: theme.colors.accentSoft,
+    backgroundColor:
+      theme.colors.accentSoft,
   },
 
   navSymbol: {
-    color: theme.colors.textSecondary,
+    color:
+      theme.colors.textSecondary,
     fontSize: 18,
     lineHeight: 20,
   },
@@ -1100,7 +1233,8 @@ const styles = StyleSheet.create({
   },
 
   navLabel: {
-    color: theme.colors.textSecondary,
+    color:
+      theme.colors.textSecondary,
     fontSize: 10,
     fontWeight: "500",
     marginTop: 3,

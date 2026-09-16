@@ -1,8 +1,10 @@
 import {
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 
@@ -12,10 +14,13 @@ import { useEffect, useState } from "react";
 import { theme } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
 
-import { getAthleteData } from "../lib/athlete";
-import { AthleteData } from "../types/athlete";
+import {
+  getAthleteData,
+  updatePowerProfile,
+} from "../lib/athlete";
 
 import { estimateVo2Max } from "../lib/physiology/vo2Max";
+import { AthleteData } from "../types/athlete";
 
 export default function ProfilePage() {
   const { user, signOut } = useAuth();
@@ -26,6 +31,15 @@ export default function ProfilePage() {
 
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
+
+  // Power editor state
+  const [isEditingPower, setIsEditingPower] = useState(false);
+  const [isSavingPower, setIsSavingPower] = useState(false);
+  const [powerError, setPowerError] = useState<string | null>(null);
+
+  const [oneMinutePower, setOneMinutePower] = useState("");
+  const [fiveMinutePower, setFiveMinutePower] = useState("");
+  const [twelveMinutePower, setTwelveMinutePower] = useState("");
 
   useEffect(() => {
     if (!user) {
@@ -50,9 +64,7 @@ export default function ProfilePage() {
         console.error("Failed to load athlete profile:", error);
 
         if (isMounted) {
-          setProfileError(
-            "Unable to load your athlete profile."
-          );
+          setProfileError("Unable to load your athlete profile.");
         }
       } finally {
         if (isMounted) {
@@ -87,29 +99,24 @@ export default function ProfilePage() {
     [firstName, lastName].filter(Boolean).join(" ") || "Athlete";
 
   const initials =
-    `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() ||
-    "A";
+    `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "A";
 
-  const firstInitial =
-    firstName.charAt(0).toUpperCase() || "A";
+  const firstInitial = firstName.charAt(0).toUpperCase() || "A";
 
-  const sport =
-    profile?.primary_sport
-      ? formatLabel(profile.primary_sport)
-      : "—";
+  const sport = profile?.primary_sport
+    ? formatLabel(profile.primary_sport)
+    : "—";
 
-  const athleteLevel =
-    profile?.training_history
-      ? formatLabel(profile.training_history)
-      : "—";
+  const athleteLevel = profile?.training_history
+    ? formatLabel(profile.training_history)
+    : "—";
 
   const bodyMass =
     profile?.weight_kg != null
       ? `${Number(profile.weight_kg).toFixed(1)} kg`
       : "—";
 
-  const trainingVolume =
-    formatWeeklyVolume(profile?.weekly_volume);
+  const trainingVolume = formatWeeklyVolume(profile?.weekly_volume);
 
   const profileSubtitle =
     sport !== "—" && athleteLevel !== "—"
@@ -117,6 +124,78 @@ export default function ProfilePage() {
       : sport !== "—"
         ? sport
         : athleteLevel;
+
+  function handleOpenPowerEditor() {
+    if (!powerProfile) return;
+
+    setOneMinutePower(String(powerProfile.one_minute_watts ?? ""));
+    setFiveMinutePower(String(powerProfile.five_minute_watts ?? ""));
+    setTwelveMinutePower(String(powerProfile.twelve_minute_watts ?? ""));
+
+    setPowerError(null);
+    setIsEditingPower(true);
+  }
+
+  function handleClosePowerEditor() {
+    if (isSavingPower) return;
+
+    setPowerError(null);
+    setIsEditingPower(false);
+  }
+
+  async function handleSavePower() {
+    if (!user) return;
+
+      const oneMinute = Number(oneMinutePower);
+      const fiveMinute = Number(fiveMinutePower);
+      const twelveMinute = Number(twelveMinutePower);
+
+      if (
+        !Number.isFinite(oneMinute) ||
+        !Number.isFinite(fiveMinute) ||
+        !Number.isFinite(twelveMinute) ||
+        oneMinute <= 0 ||
+        fiveMinute <= 0 ||
+        twelveMinute <= 0
+      ) {
+        setPowerError("Enter valid power values greater than 0.");
+        return;
+      }
+
+      try {
+        setIsSavingPower(true);
+        setPowerError(null);
+
+        const updatedPowerProfile =
+          await updatePowerProfile(user.id, {
+            one_minute_watts: oneMinute,
+            five_minute_watts: fiveMinute,
+            twelve_minute_watts: twelveMinute,
+          });
+
+        setAthlete((current) => {
+          if (!current) return current;
+
+          return {
+            ...current,
+            powerProfile: updatedPowerProfile,
+          };
+        });
+
+        setIsEditingPower(false);
+      } catch (error) {
+        console.error(
+          "Failed to update power profile:",
+          error
+        );
+
+        setPowerError(
+          "Unable to update your power profile. Please try again."
+        );
+      } finally {
+        setIsSavingPower(false);
+      }
+    }
 
   async function handleSignOut() {
     if (isSigningOut) return;
@@ -131,9 +210,7 @@ export default function ProfilePage() {
     } catch (error) {
       console.error("Sign out failed:", error);
 
-      setSignOutError(
-        "Unable to sign out. Please try again."
-      );
+      setSignOutError("Unable to sign out. Please try again.");
     } finally {
       setIsSigningOut(false);
     }
@@ -146,23 +223,21 @@ export default function ProfilePage() {
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.container}>
+          {/* Header */}
           <View style={styles.header}>
             <Pressable onPress={() => router.push("/")}>
-                        <Text style={styles.logo}>VECTOR</Text>
-                        </Pressable>
+              <Text style={styles.logo}>VECTOR</Text>
+            </Pressable>
 
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {firstInitial}
-              </Text>
+              <Text style={styles.avatarText}>{firstInitial}</Text>
             </View>
           </View>
 
+          {/* Profile header */}
           <View style={styles.profileHeader}>
             <View style={styles.largeAvatar}>
-              <Text style={styles.largeAvatarText}>
-                {initials}
-              </Text>
+              <Text style={styles.largeAvatarText}>{initials}</Text>
             </View>
 
             <View>
@@ -171,11 +246,22 @@ export default function ProfilePage() {
               </Text>
 
               <Text style={styles.profileSub}>
-                {isLoadingProfile ? "Loading athlete profile..." : profileSubtitle}
+                {isLoadingProfile
+                  ? "Loading athlete profile..."
+                  : profileSubtitle}
               </Text>
             </View>
           </View>
 
+          {profileError ? (
+            <View style={styles.profileError}>
+              <Text style={styles.profileErrorText}>
+                {profileError}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Quick stats */}
           <View style={styles.quickStats}>
             <QuickStat
               label="Body mass"
@@ -199,9 +285,8 @@ export default function ProfilePage() {
             />
           </View>
 
-          <Text style={styles.sectionTitle}>
-            Athlete
-          </Text>
+          {/* Athlete */}
+          <Text style={styles.sectionTitle}>Athlete</Text>
 
           <View style={styles.card}>
             <Row
@@ -232,20 +317,35 @@ export default function ProfilePage() {
             />
           </View>
 
-          <Text style={styles.sectionTitle}>
-            Current model
-          </Text>
+          {/* Current model */}
+          <View style={styles.modelSectionHeader}>
+            <Text style={styles.modelSectionTitle}>
+              Current model
+            </Text>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.editButton,
+                pressed ? styles.editButtonPressed : undefined,
+                !powerProfile || isLoadingProfile
+                  ? styles.editButtonDisabled
+                  : undefined,
+              ]}
+              onPress={handleOpenPowerEditor}
+              disabled={!powerProfile || isLoadingProfile}
+            >
+              <Text style={styles.editButtonText}>Edit</Text>
+            </Pressable>
+          </View>
 
           <View style={styles.modelCard}>
             <View style={styles.modelMetric}>
-              <Text style={styles.modelLabel}>
-                1 MIN POWER
-              </Text>
+              <Text style={styles.modelLabel}>1 MIN POWER</Text>
 
               <Text style={styles.modelValue}>
                 {isLoadingProfile
                   ? "..."
-                  : powerProfile
+                  : powerProfile?.one_minute_watts != null
                     ? `${powerProfile.one_minute_watts} W`
                     : "—"}
               </Text>
@@ -254,14 +354,12 @@ export default function ProfilePage() {
             <View style={styles.modelDivider} />
 
             <View style={styles.modelMetric}>
-              <Text style={styles.modelLabel}>
-                5 MIN POWER
-              </Text>
+              <Text style={styles.modelLabel}>5 MIN POWER</Text>
 
               <Text style={styles.modelValue}>
                 {isLoadingProfile
                   ? "..."
-                  : powerProfile
+                  : powerProfile?.five_minute_watts != null
                     ? `${powerProfile.five_minute_watts} W`
                     : "—"}
               </Text>
@@ -270,35 +368,24 @@ export default function ProfilePage() {
             <View style={styles.modelDivider} />
 
             <View style={styles.modelMetric}>
-              <Text style={styles.modelLabel}>
-                12 MIN POWER
-              </Text>
+              <Text style={styles.modelLabel}>12 MIN POWER</Text>
 
               <Text style={styles.modelValue}>
                 {isLoadingProfile
                   ? "..."
-                  : powerProfile
+                  : powerProfile?.twelve_minute_watts != null
                     ? `${powerProfile.twelve_minute_watts} W`
                     : "—"}
               </Text>
             </View>
           </View>
 
-          <Text style={styles.sectionTitle}>
-            Connections
-          </Text>
+          {/* Connections */}
+          <Text style={styles.sectionTitle}>Connections</Text>
 
           <View style={styles.card}>
-            <Connection
-              name="Strava"
-              status="Coming soon"
-            />
-
-            <Connection
-              name="Garmin"
-              status="Coming soon"
-            />
-
+            <Connection name="Strava" status="Coming soon" />
+            <Connection name="Garmin" status="Coming soon" />
             <Connection
               name="Apple Health"
               status="Coming soon"
@@ -306,14 +393,13 @@ export default function ProfilePage() {
             />
           </View>
 
-          <Text style={styles.sectionTitle}>
-            Account
-          </Text>
+          {/* Account */}
+          <Text style={styles.sectionTitle}>Account</Text>
 
           <View style={styles.card}>
             <Row
               label="Email"
-              value={user?.email ?? "-"}
+              value={user?.email ?? "—"}
             />
 
             <Row
@@ -324,13 +410,17 @@ export default function ProfilePage() {
             <Pressable
               style={[
                 styles.signOut,
-                isSigningOut ? styles.signOutDisabled : undefined,
+                isSigningOut
+                  ? styles.signOutDisabled
+                  : undefined,
               ]}
               onPress={handleSignOut}
               disabled={isSigningOut}
             >
               <Text style={styles.signOutText}>
-                {isSigningOut ? "Signing out..." : "Sign out"}
+                {isSigningOut
+                  ? "Signing out..."
+                  : "Sign out"}
               </Text>
             </Pressable>
 
@@ -344,6 +434,91 @@ export default function ProfilePage() {
       </ScrollView>
 
       <BottomNav />
+
+      {/* Power editor modal */}
+      <Modal
+        visible={isEditingPower}
+        transparent
+        animationType="fade"
+        onRequestClose={handleClosePowerEditor}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderText}>
+                <Text style={styles.modalTitle}>
+                  Update power profile
+                </Text>
+
+                <Text style={styles.modalSubtitle}>
+                  Enter your current maximal efforts.
+                </Text>
+              </View>
+
+              <Pressable
+                style={styles.modalCloseButton}
+                onPress={handleClosePowerEditor}
+                disabled={isSavingPower}
+              >
+                <Text style={styles.modalClose}>×</Text>
+              </Pressable>
+            </View>
+
+            <PowerInput
+              label="1 minute power"
+              value={oneMinutePower}
+              onChangeText={setOneMinutePower}
+            />
+
+            <PowerInput
+              label="5 minute power"
+              value={fiveMinutePower}
+              onChangeText={setFiveMinutePower}
+            />
+
+            <PowerInput
+              label="12 minute power"
+              value={twelveMinutePower}
+              onChangeText={setTwelveMinutePower}
+            />
+
+            {powerError ? (
+              <Text style={styles.powerError}>
+                {powerError}
+              </Text>
+            ) : null}
+
+            <View style={styles.modalActions}>
+              <Pressable
+                style={styles.cancelButton}
+                onPress={handleClosePowerEditor}
+                disabled={isSavingPower}
+              >
+                <Text style={styles.cancelButtonText}>
+                  Cancel
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={[
+                  styles.saveButton,
+                  isSavingPower
+                    ? styles.saveButtonDisabled
+                    : undefined,
+                ]}
+                onPress={handleSavePower}
+                disabled={isSavingPower}
+              >
+                <Text style={styles.saveButtonText}>
+                  {isSavingPower
+                    ? "Saving..."
+                    : "Save changes"}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -425,6 +600,42 @@ function Row({
   );
 }
 
+type PowerInputProps = {
+  label: string;
+  value: string;
+  onChangeText: (value: string) => void;
+};
+
+function PowerInput({
+  label,
+  value,
+  onChangeText,
+}: PowerInputProps) {
+  return (
+    <View style={styles.powerInputGroup}>
+      <Text style={styles.powerInputLabel}>
+        {label}
+      </Text>
+
+      <View style={styles.powerInputWrapper}>
+        <TextInput
+          style={styles.powerInput}
+          value={value}
+          onChangeText={onChangeText}
+          keyboardType="numeric"
+          placeholder="0"
+          placeholderTextColor={
+            theme.colors.textSecondary
+          }
+          selectTextOnFocus
+        />
+
+        <Text style={styles.powerUnit}>W</Text>
+      </View>
+    </View>
+  );
+}
+
 type ConnectionProps = {
   name: string;
   status: string;
@@ -465,26 +676,34 @@ function BottomNav() {
         <Nav
           symbol="⌂"
           label="Home"
-          onPress={() => router.push("/dashboard")}
+          onPress={() =>
+            router.push("/dashboard")
+          }
         />
 
         <Nav
           symbol="⌁"
           label="Training"
-          onPress={() => router.push("/training")}
+          onPress={() =>
+            router.push("/training")
+          }
         />
 
         <Nav
           symbol="↗"
           label="Power"
-          onPress={() => router.push("/power")}
+          onPress={() =>
+            router.push("/power")
+          }
         />
 
         <Nav
           symbol="○"
           label="Profile"
           active
-          onPress={() => router.push("/profile")}
+          onPress={() =>
+            router.push("/profile")
+          }
         />
       </View>
     </View>
@@ -508,14 +727,18 @@ function Nav({
     <Pressable
       style={[
         styles.navItem,
-        active ? styles.navItemActive : undefined,
+        active
+          ? styles.navItemActive
+          : undefined,
       ]}
       onPress={onPress}
     >
       <Text
         style={[
           styles.navSymbol,
-          active ? styles.navSymbolActive : undefined,
+          active
+            ? styles.navSymbolActive
+            : undefined,
         ]}
       >
         {symbol}
@@ -524,7 +747,9 @@ function Nav({
       <Text
         style={[
           styles.navLabel,
-          active ? styles.navLabelActive : undefined,
+          active
+            ? styles.navLabelActive
+            : undefined,
         ]}
       >
         {label}
@@ -576,6 +801,7 @@ const styles = StyleSheet.create({
   },
 
   avatarText: {
+    color: theme.colors.text,
     fontWeight: "700",
   },
 
@@ -613,12 +839,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: 13,
     marginTop: 5,
-  },
-
-  location: {
-    color: theme.colors.textSecondary,
-    fontSize: 11,
-    marginTop: 4,
   },
 
   quickStats: {
@@ -691,6 +911,44 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 
+  modelSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 28,
+    marginBottom: 12,
+  },
+
+  modelSectionTitle: {
+    color: theme.colors.text,
+    fontSize: 20,
+    fontWeight: "600",
+  },
+
+  editButton: {
+    minWidth: 58,
+    minHeight: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.accentSoft,
+    paddingHorizontal: 14,
+  },
+
+  editButtonPressed: {
+    opacity: 0.7,
+  },
+
+  editButtonDisabled: {
+    opacity: 0.4,
+  },
+
+  editButtonText: {
+    color: theme.colors.accent,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
   modelCard: {
     flexDirection: "row",
     backgroundColor: theme.colors.text,
@@ -720,43 +978,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "600",
     marginTop: 6,
-  },
-
-  goalCard: {
-    padding: 23,
-    borderRadius: 18,
-    backgroundColor: theme.colors.accentSoft,
-  },
-
-  goalTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-
-  goalEyebrow: {
-    color: theme.colors.accent,
-    fontSize: 9,
-    fontWeight: "700",
-    letterSpacing: 1.1,
-  },
-
-  goalTitle: {
-    color: theme.colors.text,
-    fontSize: 21,
-    fontWeight: "600",
-    marginTop: 6,
-  },
-
-  goalArrow: {
-    color: theme.colors.accent,
-    fontSize: 24,
-  },
-
-  goalDescription: {
-    color: theme.colors.textSecondary,
-    fontSize: 12,
-    lineHeight: 19,
-    marginTop: 12,
   },
 
   connection: {
@@ -795,21 +1016,33 @@ const styles = StyleSheet.create({
   },
 
   signOutDisabled: {
-  opacity: 0.5,
-},
+    opacity: 0.5,
+  },
 
-signOutError: {
-  color: "#A64E4E",
-  fontSize: 11,
-  textAlign: "center",
-  paddingHorizontal: 20,
-  paddingBottom: 16,
-},
+  signOutError: {
+    color: "#A64E4E",
+    fontSize: 11,
+    textAlign: "center",
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
 
   signOutText: {
     color: "#A64E4E",
     fontSize: 12,
     fontWeight: "600",
+  },
+
+  profileError: {
+    backgroundColor: "#FDECEC",
+    borderRadius: theme.radius.md,
+    padding: 14,
+    marginBottom: 24,
+  },
+
+  profileErrorText: {
+    color: "#A64E4E",
+    fontSize: 12,
   },
 
   navWrapper: {
@@ -875,15 +1108,144 @@ signOutError: {
     fontWeight: "600",
   },
 
-  profileError: {
-    backgroundColor: "#FDECEC",
-    borderRadius: theme.radius.md,
-    padding: 14,
-    marginTop: 20,
+  // Power editor modal
+
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
   },
 
-  profileErrorText: {
-    color: "#A64E4E",
+  modalCard: {
+    width: "100%",
+    maxWidth: 480,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.lg,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginBottom: 24,
+  },
+
+  modalHeaderText: {
+    flex: 1,
+    paddingRight: 20,
+  },
+
+  modalTitle: {
+    color: theme.colors.text,
+    fontSize: 22,
+    fontWeight: "700",
+    letterSpacing: -0.5,
+  },
+
+  modalSubtitle: {
+    color: theme.colors.textSecondary,
     fontSize: 12,
+    marginTop: 6,
+  },
+
+  modalCloseButton: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  modalClose: {
+    color: theme.colors.textSecondary,
+    fontSize: 26,
+    lineHeight: 28,
+  },
+
+  powerInputGroup: {
+    marginBottom: 16,
+  },
+
+  powerInputLabel: {
+    color: theme.colors.text,
+    fontSize: 12,
+    fontWeight: "600",
+    marginBottom: 7,
+  },
+
+  powerInputWrapper: {
+    minHeight: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.background,
+    paddingHorizontal: 14,
+  },
+
+  powerInput: {
+    flex: 1,
+    color: theme.colors.text,
+    fontSize: 15,
+    paddingVertical: 12,
+  },
+
+  powerUnit: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+
+  powerError: {
+    color: "#A64E4E",
+    fontSize: 11,
+    marginBottom: 14,
+  },
+
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+    marginTop: 8,
+  },
+
+  cancelButton: {
+    minHeight: 44,
+    paddingHorizontal: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+
+  cancelButtonText: {
+    color: theme.colors.text,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  saveButton: {
+    minHeight: 44,
+    paddingHorizontal: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.accent,
+  },
+
+  saveButtonDisabled: {
+    opacity: 0.5,
+  },
+
+  saveButtonText: {
+    color: theme.colors.white,
+    fontSize: 12,
+    fontWeight: "700",
   },
 });

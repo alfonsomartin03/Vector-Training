@@ -1,18 +1,85 @@
+import { router } from "expo-router";
+import { useState } from "react";
 import {
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    useWindowDimensions,
-    View,
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
 } from "react-native";
 
-import { router } from "expo-router";
 import { theme } from "../constants/theme";
+import { supabase } from "../lib/supabase";
 
 export default function LoginPage() {
   const { width } = useWindowDimensions();
   const isMobile = width < 700;
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  async function handleLogin() {
+    // Prevent multiple login requests
+    if (isLoading) return;
+
+    setError(null);
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Basic validation
+    if (!cleanEmail || !password) {
+      setError("Enter your email and password.");
+      return;
+    }
+
+    if (!cleanEmail.includes("@")) {
+      setError("Enter a valid email address.");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      const { data, error: signInError } =
+        await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        });
+
+      if (signInError) {
+        console.error("Login error:", signInError);
+
+        setError(
+          signInError.message === "Invalid login credentials"
+            ? "Incorrect email or password."
+            : signInError.message
+        );
+
+        return;
+      }
+
+      if (!data.session) {
+        setError("Unable to create a login session.");
+        return;
+      }
+
+      // Successful login
+      router.replace("/dashboard");
+    } catch (err) {
+      console.error("Unexpected login error:", err);
+
+      setError(
+        "Something went wrong while signing in. Please try again."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   return (
     <View style={styles.page}>
@@ -57,18 +124,15 @@ export default function LoginPage() {
               </Pressable>
             ) : null}
 
-            <Text style={styles.title}>
-              Welcome back.
-            </Text>
+            <Text style={styles.title}>Welcome back.</Text>
 
             <Text style={styles.subtitle}>
               Sign in to continue your training.
             </Text>
 
+            {/* Email */}
             <View style={styles.field}>
-              <Text style={styles.label}>
-                Email
-              </Text>
+              <Text style={styles.label}>Email</Text>
 
               <TextInput
                 style={styles.input}
@@ -76,46 +140,72 @@ export default function LoginPage() {
                 placeholderTextColor="#A0A5A3"
                 keyboardType="email-address"
                 autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                value={email}
+                onChangeText={setEmail}
+                editable={!isLoading}
+                returnKeyType="next"
               />
             </View>
 
+            {/* Password */}
             <View style={styles.field}>
-              <Text style={styles.label}>
-                Password
-              </Text>
+              <Text style={styles.label}>Password</Text>
 
               <TextInput
                 style={styles.input}
                 placeholder="Enter your password"
                 placeholderTextColor="#A0A5A3"
                 secureTextEntry
+                autoCapitalize="none"
+                autoComplete="password"
+                value={password}
+                onChangeText={setPassword}
+                editable={!isLoading}
+                returnKeyType="done"
+                onSubmitEditing={handleLogin}
               />
             </View>
 
             <Pressable
               style={styles.forgotButton}
               onPress={() => {}}
+              disabled={isLoading}
             >
               <Text style={styles.forgotText}>
                 Forgot your password?
               </Text>
             </Pressable>
 
+            {/* Authentication error */}
+            {error ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+
+            {/* Sign in */}
             <Pressable
-              style={styles.signInButton}
-              onPress={() => router.push("/dashboard")}
+              style={({ pressed }) => [
+                styles.signInButton,
+                (pressed || isLoading) &&
+                  styles.signInButtonDisabled,
+              ]}
+              onPress={handleLogin}
+              disabled={isLoading}
             >
-              <Text style={styles.signInText}>
-                Sign in
-              </Text>
+              {isLoading ? (
+                <ActivityIndicator color={theme.colors.white} />
+              ) : (
+                <Text style={styles.signInText}>Sign in</Text>
+              )}
             </Pressable>
 
             <View style={styles.dividerRow}>
               <View style={styles.divider} />
 
-              <Text style={styles.dividerText}>
-                or
-              </Text>
+              <Text style={styles.dividerText}>or</Text>
 
               <View style={styles.divider} />
             </View>
@@ -123,6 +213,7 @@ export default function LoginPage() {
             <Pressable
               style={styles.createButton}
               onPress={() => router.push("/register")}
+              disabled={isLoading}
             >
               <Text style={styles.createText}>
                 Create an account
@@ -132,6 +223,7 @@ export default function LoginPage() {
             <Pressable
               style={styles.backButton}
               onPress={() => router.push("/")}
+              disabled={isLoading}
             >
               <Text style={styles.backText}>
                 ← Back to Vector
@@ -272,12 +364,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 
+  errorContainer: {
+    backgroundColor: "#FDECEC",
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    marginBottom: 16,
+  },
+
+  errorText: {
+    color: "#A63D40",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+
   signInButton: {
     height: 52,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.text,
+  },
+
+  signInButtonDisabled: {
+    opacity: 0.65,
   },
 
   signInText: {

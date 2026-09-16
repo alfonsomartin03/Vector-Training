@@ -1,15 +1,144 @@
 import {
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
 import { router } from "expo-router";
+import { useEffect, useState } from "react";
+
 import { theme } from "../constants/theme";
+import { useAuth } from "../context/AuthContext";
+
+import { getAthleteData } from "../lib/athlete";
+import { AthleteData } from "../types/athlete";
+
+import { estimateVo2Max } from "../lib/physiology/vo2Max";
 
 export default function ProfilePage() {
+  const { user, signOut } = useAuth();
+
+  const [athlete, setAthlete] = useState<AthleteData | null>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      setAthlete(null);
+      setIsLoadingProfile(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    async function loadAthlete() {
+      try {
+        setIsLoadingProfile(true);
+        setProfileError(null);
+
+        const athleteData = await getAthleteData(user!.id);
+
+        if (isMounted) {
+          setAthlete(athleteData);
+        }
+      } catch (error) {
+        console.error("Failed to load athlete profile:", error);
+
+        if (isMounted) {
+          setProfileError(
+            "Unable to load your athlete profile."
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingProfile(false);
+        }
+      }
+    }
+
+    loadAthlete();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  const profile = athlete?.profile;
+  const powerProfile = athlete?.powerProfile;
+
+  const estimatedVo2Max =
+    profile?.weight_kg != null &&
+    powerProfile?.five_minute_watts != null
+      ? estimateVo2Max(
+          Number(powerProfile.five_minute_watts),
+          Number(profile.weight_kg)
+        )
+      : null;
+
+  const firstName = profile?.first_name ?? "";
+  const lastName = profile?.last_name ?? "";
+
+  const fullName =
+    [firstName, lastName].filter(Boolean).join(" ") || "Athlete";
+
+  const initials =
+    `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() ||
+    "A";
+
+  const firstInitial =
+    firstName.charAt(0).toUpperCase() || "A";
+
+  const sport =
+    profile?.primary_sport
+      ? formatLabel(profile.primary_sport)
+      : "—";
+
+  const athleteLevel =
+    profile?.training_history
+      ? formatLabel(profile.training_history)
+      : "—";
+
+  const bodyMass =
+    profile?.weight_kg != null
+      ? `${Number(profile.weight_kg).toFixed(1)} kg`
+      : "—";
+
+  const trainingVolume =
+    formatWeeklyVolume(profile?.weekly_volume);
+
+  const profileSubtitle =
+    sport !== "—" && athleteLevel !== "—"
+      ? `${sport} · ${athleteLevel}`
+      : sport !== "—"
+        ? sport
+        : athleteLevel;
+
+  async function handleSignOut() {
+    if (isSigningOut) return;
+
+    try {
+      setIsSigningOut(true);
+      setSignOutError(null);
+
+      await signOut();
+
+      router.replace("/login");
+    } catch (error) {
+      console.error("Sign out failed:", error);
+
+      setSignOutError(
+        "Unable to sign out. Please try again."
+      );
+    } finally {
+      setIsSigningOut(false);
+    }
+  }
+
   return (
     <View style={styles.page}>
       <ScrollView
@@ -24,7 +153,7 @@ export default function ProfilePage() {
 
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>
-                A
+                {firstInitial}
               </Text>
             </View>
           </View>
@@ -32,21 +161,17 @@ export default function ProfilePage() {
           <View style={styles.profileHeader}>
             <View style={styles.largeAvatar}>
               <Text style={styles.largeAvatarText}>
-                TU
+                {initials}
               </Text>
             </View>
 
             <View>
               <Text style={styles.name}>
-                Test User
+                {isLoadingProfile ? "Loading..." : fullName}
               </Text>
 
               <Text style={styles.profileSub}>
-                Road cyclist · Advanced
-              </Text>
-
-              <Text style={styles.location}>
-                Gainesville, FL
+                {isLoadingProfile ? "Loading athlete profile..." : profileSubtitle}
               </Text>
             </View>
           </View>
@@ -54,17 +179,23 @@ export default function ProfilePage() {
           <View style={styles.quickStats}>
             <QuickStat
               label="Body mass"
-              value="70.0 kg"
+              value={isLoadingProfile ? "..." : bodyMass}
             />
 
             <QuickStat
               label="Training"
-              value="12–14 h/wk"
+              value={isLoadingProfile ? "..." : trainingVolume}
             />
 
             <QuickStat
-              label="Experience"
-              value="5 years"
+              label="Est. VO₂max"
+              value={
+                isLoadingProfile
+                  ? "..."
+                  : estimatedVo2Max != null
+                    ? `${estimatedVo2Max.toFixed(1)} mL/kg/min`
+                    : "—"
+              }
             />
           </View>
 
@@ -74,23 +205,29 @@ export default function ProfilePage() {
 
           <View style={styles.card}>
             <Row
-              label="Primary discipline"
-              value="Road racing"
+              label="Primary sport"
+              value={isLoadingProfile ? "..." : sport}
             />
 
             <Row
               label="Athlete level"
-              value="Advanced"
+              value={isLoadingProfile ? "..." : athleteLevel}
             />
 
             <Row
-              label="Primary goal"
-              value="Increase sustainable power"
+              label="Weekly training"
+              value={isLoadingProfile ? "..." : trainingVolume}
             />
 
             <Row
-              label="Current focus"
-              value="Aerobic development"
+              label="Max efforts confirmed"
+              value={
+                isLoadingProfile
+                  ? "..."
+                  : powerProfile?.maximal_efforts_confirmed
+                    ? "Yes"
+                    : "No"
+              }
               last
             />
           </View>
@@ -102,11 +239,15 @@ export default function ProfilePage() {
           <View style={styles.modelCard}>
             <View style={styles.modelMetric}>
               <Text style={styles.modelLabel}>
-                CRITICAL POWER
+                1 MIN POWER
               </Text>
 
               <Text style={styles.modelValue}>
-                291 W
+                {isLoadingProfile
+                  ? "..."
+                  : powerProfile
+                    ? `${powerProfile.one_minute_watts} W`
+                    : "—"}
               </Text>
             </View>
 
@@ -114,11 +255,15 @@ export default function ProfilePage() {
 
             <View style={styles.modelMetric}>
               <Text style={styles.modelLabel}>
-                W′
+                5 MIN POWER
               </Text>
 
               <Text style={styles.modelValue}>
-                18.7 kJ
+                {isLoadingProfile
+                  ? "..."
+                  : powerProfile
+                    ? `${powerProfile.five_minute_watts} W`
+                    : "—"}
               </Text>
             </View>
 
@@ -126,40 +271,17 @@ export default function ProfilePage() {
 
             <View style={styles.modelMetric}>
               <Text style={styles.modelLabel}>
-                EST. VO₂MAX
+                12 MIN POWER
               </Text>
 
               <Text style={styles.modelValue}>
-                64.1
+                {isLoadingProfile
+                  ? "..."
+                  : powerProfile
+                    ? `${powerProfile.twelve_minute_watts} W`
+                    : "—"}
               </Text>
             </View>
-          </View>
-
-          <Text style={styles.sectionTitle}>
-            Goals
-          </Text>
-
-          <View style={styles.goalCard}>
-            <View style={styles.goalTop}>
-              <View>
-                <Text style={styles.goalEyebrow}>
-                  PRIMARY GOAL
-                </Text>
-
-                <Text style={styles.goalTitle}>
-                  Raise Critical Power
-                </Text>
-              </View>
-
-              <Text style={styles.goalArrow}>
-                ↗
-              </Text>
-            </View>
-
-            <Text style={styles.goalDescription}>
-              Develop sustainable aerobic power while maintaining your
-              current anaerobic capacity and race-specific strengths.
-            </Text>
           </View>
 
           <Text style={styles.sectionTitle}>
@@ -191,7 +313,7 @@ export default function ProfilePage() {
           <View style={styles.card}>
             <Row
               label="Email"
-              value="user@example.com"
+              value={user?.email ?? "-"}
             />
 
             <Row
@@ -200,13 +322,23 @@ export default function ProfilePage() {
             />
 
             <Pressable
-              style={styles.signOut}
-              onPress={() => router.push("/")}
+              style={[
+                styles.signOut,
+                isSigningOut ? styles.signOutDisabled : undefined,
+              ]}
+              onPress={handleSignOut}
+              disabled={isSigningOut}
             >
               <Text style={styles.signOutText}>
-                Sign out
+                {isSigningOut ? "Signing out..." : "Sign out"}
               </Text>
             </Pressable>
+
+            {signOutError ? (
+              <Text style={styles.signOutError}>
+                {signOutError}
+              </Text>
+            ) : null}
           </View>
         </View>
       </ScrollView>
@@ -214,6 +346,32 @@ export default function ProfilePage() {
       <BottomNav />
     </View>
   );
+}
+
+function formatLabel(value: string) {
+  return value
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (character) =>
+      character.toUpperCase()
+    );
+}
+
+function formatWeeklyVolume(
+  volume: string | null | undefined
+) {
+  switch (volume) {
+    case "1-5":
+      return "1–5 h/wk";
+
+    case "6-12":
+      return "6–12 h/wk";
+
+    case "12+":
+      return "12+ h/wk";
+
+    default:
+      return "—";
+  }
 }
 
 type QuickStatProps = {
@@ -636,6 +794,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
+  signOutDisabled: {
+  opacity: 0.5,
+},
+
+signOutError: {
+  color: "#A64E4E",
+  fontSize: 11,
+  textAlign: "center",
+  paddingHorizontal: 20,
+  paddingBottom: 16,
+},
+
   signOutText: {
     color: "#A64E4E",
     fontSize: 12,
@@ -703,5 +873,17 @@ const styles = StyleSheet.create({
   navLabelActive: {
     color: theme.colors.text,
     fontWeight: "600",
+  },
+
+  profileError: {
+    backgroundColor: "#FDECEC",
+    borderRadius: theme.radius.md,
+    padding: 14,
+    marginTop: 20,
+  },
+
+  profileErrorText: {
+    color: "#A64E4E",
+    fontSize: 12,
   },
 });

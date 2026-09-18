@@ -9,7 +9,7 @@ import {
 } from "react-native";
 
 import { router } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { theme } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
@@ -19,7 +19,7 @@ import {
 } from "../lib/athlete";
 import { useAthleteData } from "../hooks/useAthleteData";
 
-import { estimateVo2Max } from "../lib/physiology/vo2Max";
+import { buildAthleteModel } from "../lib/physiology/athleteModel";
 
 export default function ProfilePage() {
   const { user, signOut } = useAuth();
@@ -50,14 +50,10 @@ export default function ProfilePage() {
   const profile = athlete?.profile;
   const powerProfile = athlete?.powerProfile;
 
-  const estimatedVo2Max =
-    profile?.weight_kg != null &&
-    powerProfile?.five_minute_watts != null
-      ? estimateVo2Max(
-          Number(powerProfile.five_minute_watts),
-          Number(profile.weight_kg)
-        )
-      : null;
+  const athleteModel = useMemo(
+    () => (athlete ? buildAthleteModel(athlete) : null),
+    [athlete]
+  );
 
   const firstName = profile?.first_name ?? "";
   const lastName = profile?.last_name ?? "";
@@ -237,12 +233,12 @@ export default function ProfilePage() {
             />
 
             <QuickStat
-              label="Est. VO₂max"
+              label={athleteModel?.vo2MaxSource === "measured" ? "VO₂max" : "Est. VO₂max"}
               value={
                 isLoadingProfile
                   ? "..."
-                  : estimatedVo2Max != null
-                    ? `${estimatedVo2Max.toFixed(1)} mL/kg/min`
+                  : athleteModel
+                    ? `${athleteModel.vo2Max.toFixed(1)} mL/kg/min`
                     : "—"
               }
             />

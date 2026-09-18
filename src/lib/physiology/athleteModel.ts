@@ -22,6 +22,8 @@ export type AthleteModel = {
   timeAsymptoteSeconds: number;
 
   vo2Max: number;
+  vo2MaxSource: "measured" | "estimated";
+  vo2MaxRecordedAt: string | null;
 
   powerCurve: DisplayPowerCurvePoint[];
 
@@ -138,14 +140,40 @@ export function buildAthleteModel(
   /*
    * VO₂max estimate.
    */
-  const vo2Max = estimateVo2Max(
+  const estimatedVo2Max = estimateVo2Max(
     fiveMinuteWatts,
     weightKg
   );
 
-  if (vo2Max === null) {
+  if (estimatedVo2Max === null) {
     return null;
   }
+
+  const measuredRelativeVo2Max = Number(
+    athlete.vo2MaxTest?.relative_vo2max
+  );
+  const measuredAbsoluteVo2 = Number(
+    athlete.vo2MaxTest?.absolute_vo2_l_min
+  );
+  const measuredBodyMass = Number(
+    athlete.vo2MaxTest?.body_mass_kg
+  );
+
+  const derivedRelativeVo2Max =
+    Number.isFinite(measuredAbsoluteVo2) &&
+    measuredAbsoluteVo2 > 0 &&
+    Number.isFinite(measuredBodyMass) &&
+    measuredBodyMass > 0
+      ? (measuredAbsoluteVo2 * 1000) / measuredBodyMass
+      : null;
+
+  const hasMeasuredVo2Max =
+    Number.isFinite(measuredRelativeVo2Max) &&
+    measuredRelativeVo2Max > 0;
+
+  const vo2Max = hasMeasuredVo2Max
+    ? measuredRelativeVo2Max
+    : derivedRelativeVo2Max ?? estimatedVo2Max;
 
   /*
    * Generate Morton's modeled
@@ -173,6 +201,11 @@ export function buildAthleteModel(
       criticalPowerModel.timeAsymptoteSeconds,
 
     vo2Max,
+    vo2MaxSource:
+      hasMeasuredVo2Max || derivedRelativeVo2Max != null
+        ? "measured"
+        : "estimated",
+    vo2MaxRecordedAt: athlete.vo2MaxTest?.test_date ?? null,
 
     powerCurve,
 

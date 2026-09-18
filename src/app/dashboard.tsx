@@ -221,7 +221,7 @@ export default function DashboardPage() {
             />
 
             <MetricCard
-              label="Est. VO₂max"
+              label={model?.vo2MaxSource === "measured" ? "VO₂max" : "Est. VO₂max"}
               value={
                 isLoading
                   ? "..."
@@ -232,7 +232,7 @@ export default function DashboardPage() {
               unit=""
               secondary={
                 model
-                  ? "mL/kg/min"
+                  ? `${model.vo2MaxSource === "measured" ? "Measured" : "Estimated"} · mL/kg/min`
                   : undefined
               }
               onPress={() =>

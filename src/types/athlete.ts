@@ -22,7 +22,37 @@ export type PowerProfile = {
   recorded_at: string | null;
 };
 
+export type Vo2MaxTest = {
+  id: string;
+  user_id: string;
+  relative_vo2max: NumericDatabaseValue | null;
+  absolute_vo2_l_min: NumericDatabaseValue | null;
+  body_mass_kg: NumericDatabaseValue | null;
+  vt1_power_watts: NumericDatabaseValue | null;
+  vt2_power_watts: NumericDatabaseValue | null;
+  max_aerobic_power_watts: NumericDatabaseValue | null;
+  test_date: string;
+  source: string;
+  created_at: string;
+};
+
+export type LactateTest = {
+  id: string;
+  user_id: string;
+  lt1_power_watts: NumericDatabaseValue | null;
+  lt1_heart_rate_bpm: NumericDatabaseValue | null;
+  lt1_lactate_mmol: NumericDatabaseValue | null;
+  lt2_power_watts: NumericDatabaseValue | null;
+  lt2_heart_rate_bpm: NumericDatabaseValue | null;
+  lt2_lactate_mmol: NumericDatabaseValue | null;
+  test_date: string;
+  source: string;
+  created_at: string;
+};
+
 export type AthleteData = {
   profile: AthleteProfile;
   powerProfile: PowerProfile | null;
+  vo2MaxTest: Vo2MaxTest | null;
+  lactateTest: LactateTest | null;
 };

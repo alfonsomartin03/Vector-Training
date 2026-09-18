@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, {
   Circle,
   Defs,
@@ -183,19 +183,15 @@ export function PowerDurationChart({ model }: Props) {
             const active = point.durationSeconds === selected.durationSeconds;
 
             return (
-              <G
+              <Circle
                 key={point.durationSeconds}
-                onPress={() => setSelectedDuration(point.durationSeconds)}
-              >
-                <Circle
-                  cx={xFor(point.durationSeconds)}
-                  cy={yFor(point.powerWatts)}
-                  r={active ? 11 : 9}
-                  fill={theme.colors.surface}
-                  stroke={theme.colors.accent}
-                  strokeWidth={active ? 5 : 4}
-                />
-              </G>
+                cx={xFor(point.durationSeconds)}
+                cy={yFor(point.powerWatts)}
+                r={active ? 11 : 9}
+                fill={theme.colors.surface}
+                stroke={theme.colors.accent}
+                strokeWidth={active ? 5 : 4}
+              />
             );
           })}
 
@@ -219,6 +215,38 @@ export function PowerDurationChart({ model }: Props) {
             DURATION
           </SvgText>
         </Svg>
+      </View>
+
+      <View style={styles.observationControls}>
+        {observations.map((point) => {
+          const active = point.durationSeconds === selected.durationSeconds;
+
+          return (
+            <Pressable
+              key={point.durationSeconds}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              onPress={() => setSelectedDuration(point.durationSeconds)}
+              style={({ pressed }) => [
+                styles.observationButton,
+                active ? styles.observationButtonActive : undefined,
+                pressed ? styles.observationButtonPressed : undefined,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.observationButtonLabel,
+                  active ? styles.observationButtonLabelActive : undefined,
+                ]}
+              >
+                {point.label}
+              </Text>
+              <Text style={styles.observationButtonValue}>
+                {Math.round(point.powerWatts)} W
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       <View style={styles.legend}>
@@ -285,6 +313,43 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 18,
     marginTop: 4,
+  },
+  observationControls: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 4,
+  },
+  observationButton: {
+    flex: 1,
+    minWidth: 120,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  observationButtonActive: {
+    borderColor: theme.colors.accent,
+    backgroundColor: theme.colors.accentSoft,
+  },
+  observationButtonPressed: {
+    opacity: 0.68,
+  },
+  observationButtonLabel: {
+    color: theme.colors.textSecondary,
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  observationButtonLabelActive: {
+    color: theme.colors.accent,
+  },
+  observationButtonValue: {
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: "700",
+    marginTop: 3,
   },
   legendItem: {
     flexDirection: "row",

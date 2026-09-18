@@ -9,18 +9,14 @@ import {
 
 import { router } from "expo-router";
 import {
-  useEffect,
   useMemo,
-  useState,
 } from "react";
 
 import { theme } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
 
-import { getAthleteData } from "../lib/athlete";
+import { useAthleteData } from "../hooks/useAthleteData";
 import { buildAthleteModel } from "../lib/physiology/athleteModel";
-
-import type { AthleteData } from "../types/athlete";
 
 export default function DashboardPage() {
   const { width } = useWindowDimensions();
@@ -28,59 +24,11 @@ export default function DashboardPage() {
 
   const isMobile = width < 700;
 
-  const [athlete, setAthlete] =
-    useState<AthleteData | null>(null);
-
-  const [isLoading, setIsLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState<string | null>(null);
-
-  useEffect(() => {
-    if (!user) {
-      setAthlete(null);
-      setIsLoading(false);
-      return;
-    }
-
-    let isMounted = true;
-
-    async function loadAthlete() {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        const athleteData =
-          await getAthleteData(user!.id);
-
-        if (isMounted) {
-          setAthlete(athleteData);
-        }
-      } catch (loadError) {
-        console.error(
-          "Failed to load dashboard athlete:",
-          loadError
-        );
-
-        if (isMounted) {
-          setError(
-            "Unable to load your athlete profile."
-          );
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    loadAthlete();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user]);
+  const { athlete, isLoading, error } = useAthleteData(
+    user?.id,
+    "Unable to load your athlete profile.",
+    "Failed to load dashboard athlete:"
+  );
 
   const model = useMemo(() => {
     if (!athlete) {
@@ -374,7 +322,7 @@ export default function DashboardPage() {
               <Text
                 style={styles.sectionTitle}
               >
-                What's next
+                What’s next
               </Text>
             </View>
 

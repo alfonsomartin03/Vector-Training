@@ -1,5 +1,5 @@
 import { router, useSegments } from "expo-router";
-import { ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 import { theme } from "../constants/theme";
@@ -9,7 +9,16 @@ type AuthGateProps = {
   children: ReactNode;
 };
 
-const PUBLIC_ROUTES = ["", "login", "register"];
+const PUBLIC_ROUTES = new Set([
+  "",
+  "about",
+  "how-it-works",
+  "login",
+  "privacy",
+  "register",
+  "science",
+  "terms",
+]);
 
 export function AuthGate({ children }: AuthGateProps) {
   const { session, loading } = useAuth();
@@ -22,7 +31,7 @@ export function AuthGate({ children }: AuthGateProps) {
 
     const currentRoute = segments[0] ?? "";
 
-    const isPublicRoute = PUBLIC_ROUTES.includes(currentRoute);
+    const isPublicRoute = PUBLIC_ROUTES.has(currentRoute);
 
     /*
      * User is NOT authenticated and attempts to access

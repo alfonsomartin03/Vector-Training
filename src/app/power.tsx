@@ -7,72 +7,22 @@ import {
 } from "react-native";
 
 import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import { theme } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
 
-import { getAthleteData } from "../lib/athlete";
+import { useAthleteData } from "../hooks/useAthleteData";
 import { buildAthleteModel } from "../lib/physiology/athleteModel";
-
-import { AthleteData } from "../types/athlete";
 
 export default function PowerPage() {
   const { user } = useAuth();
 
-  const [athlete, setAthlete] =
-    useState<AthleteData | null>(null);
-
-  const [isLoading, setIsLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState<string | null>(null);
-
-  useEffect(() => {
-    if (!user) {
-      setAthlete(null);
-      setIsLoading(false);
-      return;
-    }
-
-    let isMounted = true;
-
-    async function loadPowerData() {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        const athleteData =
-          await getAthleteData(user!.id);
-
-        if (isMounted) {
-          setAthlete(athleteData);
-        }
-      } catch (loadError) {
-        console.error(
-          "Failed to load power data:",
-          loadError
-        );
-
-        if (isMounted) {
-          setError(
-            "Unable to load your power model."
-          );
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    loadPowerData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user]);
+  const { athlete, isLoading, error } = useAthleteData(
+    user?.id,
+    "Unable to load your power model.",
+    "Failed to load power data:"
+  );
 
   const model = useMemo(() => {
     if (!athlete) {

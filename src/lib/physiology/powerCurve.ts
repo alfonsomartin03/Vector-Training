@@ -1,5 +1,5 @@
 import {
-    CriticalPowerModel,
+    type CriticalPowerModel,
     predictPowerAtDuration,
 } from "./criticalPower";
 
@@ -23,9 +23,8 @@ export type DisplayPowerCurvePoint =
 /**
  * Standard durations displayed by Vector.
  *
- * We start at 60 seconds because the simple
- * two-parameter CP model should not be used
- * as a sprint-power model.
+ * We start at 60 seconds because CP models are not
+ * intended to replace a dedicated sprint-power model.
  */
 export const DEFAULT_POWER_CURVE_DURATIONS = [
   60,   // 1 minute
@@ -44,12 +43,14 @@ export const DEFAULT_POWER_CURVE_DURATIONS = [
  * Generate modeled power values for a collection
  * of durations using:
  *
- * P(t) = CP + W′ / t
+ * P(t) = CP + W′ / (t - k)
  */
 export function generatePowerCurve(
   model: Pick<
     CriticalPowerModel,
-    "cpWatts" | "wPrimeJoules"
+    | "cpWatts"
+    | "wPrimeJoules"
+    | "timeAsymptoteSeconds"
   >,
   durationsSeconds: readonly number[] =
     DEFAULT_POWER_CURVE_DURATIONS
@@ -89,7 +90,9 @@ export function generatePowerCurve(
 export function generateDisplayPowerCurve(
   model: Pick<
     CriticalPowerModel,
-    "cpWatts" | "wPrimeJoules"
+    | "cpWatts"
+    | "wPrimeJoules"
+    | "timeAsymptoteSeconds"
   >,
   durationsSeconds: readonly number[] =
     DEFAULT_POWER_CURVE_DURATIONS
@@ -124,7 +127,9 @@ export function generateDisplayPowerCurve(
 export function generateDetailedPowerCurve(
   model: Pick<
     CriticalPowerModel,
-    "cpWatts" | "wPrimeJoules"
+    | "cpWatts"
+    | "wPrimeJoules"
+    | "timeAsymptoteSeconds"
   >,
   minimumDurationSeconds = 60,
   maximumDurationSeconds = 3600,

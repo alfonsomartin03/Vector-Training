@@ -1,4 +1,4 @@
-import {
+import type {
     AthleteData,
     AthleteProfile,
     PowerProfile,
@@ -14,37 +14,34 @@ export async function getAthleteData(
    *
    * profiles.id is the Supabase Auth user ID.
    */
-  const {
-    data: profile,
-    error: profileError,
-  } = await supabase
+  const profileRequest = supabase
     .from("profiles")
-    .select("*")
+    .select(
+      "id, first_name, last_name, gender, birth_date, weight_kg, primary_sport, training_history, weekly_volume"
+    )
     .eq("id", userId)
     .single();
+
+  const powerProfileRequest = supabase
+    .from("power_profiles")
+    .select(
+      "id, user_id, one_minute_watts, five_minute_watts, twelve_minute_watts, maximal_efforts_confirmed, recorded_at"
+    )
+    .eq("user_id", userId)
+    .order("recorded_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const [
+    { data: profile, error: profileError },
+    { data: powerProfile, error: powerProfileError },
+  ] = await Promise.all([profileRequest, powerProfileRequest]);
 
   if (profileError) {
     throw new Error(
       `Unable to load athlete profile: ${profileError.message}`
     );
   }
-
-  /*
-   * Load the most recent power profile.
-   *
-   * This is deliberately ordered by recorded_at because the
-   * schema allows multiple power profiles for the same athlete.
-   */
-  const {
-    data: powerProfile,
-    error: powerProfileError,
-  } = await supabase
-    .from("power_profiles")
-    .select("*")
-    .eq("user_id", userId)
-    .order("recorded_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
 
   if (powerProfileError) {
     throw new Error(
@@ -78,7 +75,9 @@ export async function updatePowerProfile(
       maximal_efforts_confirmed: true,
       recorded_at: new Date().toISOString(),
     })
-    .select("*")
+    .select(
+      "id, user_id, one_minute_watts, five_minute_watts, twelve_minute_watts, maximal_efforts_confirmed, recorded_at"
+    )
     .single();
 
   if (error) {

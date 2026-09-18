@@ -1,12 +1,12 @@
-import { AthleteData } from "../../types/athlete";
+import type { AthleteData } from "../../types/athlete";
 
 import {
     calculateCriticalPowerFromProfile,
-    CriticalPowerModel,
+    type CriticalPowerModel,
 } from "./criticalPower";
 
 import {
-    DisplayPowerCurvePoint,
+    type DisplayPowerCurvePoint,
     generateDisplayPowerCurve,
 } from "./powerCurve";
 

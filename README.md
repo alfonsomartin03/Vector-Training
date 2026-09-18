@@ -6,6 +6,18 @@ A cross-platform cycling training app that builds an evolving physiological mode
 
 Instead of prescribing workouts from a single FTP value, the app identifies **what is currently limiting the rider**, selects an appropriate training stimulus, and generates workouts around the athlete's actual power profile.
 
+## Development
+
+Requirements: Node.js 20 or newer and an Expo-compatible iOS, Android, or web environment.
+
+```bash
+cp .env.example .env
+npm install
+npm run web
+```
+
+Set the two Supabase values in `.env` before starting. Use `npm run typecheck` and `npm run lint` before committing changes.
+
 ---
 
 ## Why This Is Different

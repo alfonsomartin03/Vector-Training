@@ -11,6 +11,7 @@ import {
 
 import { router } from "expo-router";
 
+import { MarketingHeader } from "../components/MarketingHeader";
 import Button from "../components/ui/Button";
 import { theme } from "../constants/theme";
 
@@ -33,37 +34,7 @@ export default function LandingPage() {
           isLarge ? styles.containerLarge : undefined,
         ]}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <Pressable onPress={() => router.push("/")}>
-            <Text style={styles.logo}>VECTOR</Text>
-          </Pressable>
-
-          {!isMobile ? (
-            <View style={styles.nav}>
-              <NavLink
-                title="How it works"
-                onPress={() => router.push("/how-it-works")}
-              />
-
-              <NavLink
-                title="The science"
-                onPress={() => router.push("/science")}
-              />
-
-              <NavLink
-                title="About"
-                onPress={() => router.push("/about")}
-              />
-            </View>
-          ) : null}
-
-          <Button
-            title="Log in"
-            variant="secondary"
-            onPress={() => router.push("/login")}
-          />
-        </View>
+        <MarketingHeader />
 
         {/* Hero */}
         <View
@@ -798,10 +769,7 @@ type NavLinkProps = {
   onPress: () => void;
 };
 
-function NavLink({
-  title,
-  onPress,
-}: NavLinkProps) {
+function NavLink({ title, onPress }: NavLinkProps) {
   return (
     <Pressable
       onPress={onPress}
@@ -810,9 +778,7 @@ function NavLink({
         pressed ? styles.navLinkPressed : undefined,
       ]}
     >
-      <Text style={styles.navLinkText}>
-        {title}
-      </Text>
+      <Text style={styles.navLinkText}>{title}</Text>
     </Pressable>
   );
 }
@@ -835,29 +801,6 @@ const styles = StyleSheet.create({
 
   containerLarge: {
     paddingHorizontal: 0,
-  },
-
-  header: {
-    minHeight: 90,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 24,
-  },
-
-  logo: {
-    color: theme.colors.text,
-    fontSize: 19,
-    fontWeight: "800",
-    letterSpacing: 4,
-  },
-
-  nav: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 30,
-    marginLeft: "auto",
-    marginRight: 10,
   },
 
   navLink: {

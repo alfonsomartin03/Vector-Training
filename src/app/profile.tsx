@@ -9,25 +9,31 @@ import {
 } from "react-native";
 
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { theme } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
 
 import {
-  getAthleteData,
   updatePowerProfile,
 } from "../lib/athlete";
+import { useAthleteData } from "../hooks/useAthleteData";
 
 import { estimateVo2Max } from "../lib/physiology/vo2Max";
-import { AthleteData } from "../types/athlete";
 
 export default function ProfilePage() {
   const { user, signOut } = useAuth();
 
-  const [athlete, setAthlete] = useState<AthleteData | null>(null);
-  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
-  const [profileError, setProfileError] = useState<string | null>(null);
+  const {
+    athlete,
+    setAthlete,
+    isLoading: isLoadingProfile,
+    error: profileError,
+  } = useAthleteData(
+    user?.id,
+    "Unable to load your athlete profile.",
+    "Failed to load athlete profile:"
+  );
 
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
@@ -40,45 +46,6 @@ export default function ProfilePage() {
   const [oneMinutePower, setOneMinutePower] = useState("");
   const [fiveMinutePower, setFiveMinutePower] = useState("");
   const [twelveMinutePower, setTwelveMinutePower] = useState("");
-
-  useEffect(() => {
-    if (!user) {
-      setAthlete(null);
-      setIsLoadingProfile(false);
-      return;
-    }
-
-    let isMounted = true;
-
-    async function loadAthlete() {
-      try {
-        setIsLoadingProfile(true);
-        setProfileError(null);
-
-        const athleteData = await getAthleteData(user!.id);
-
-        if (isMounted) {
-          setAthlete(athleteData);
-        }
-      } catch (error) {
-        console.error("Failed to load athlete profile:", error);
-
-        if (isMounted) {
-          setProfileError("Unable to load your athlete profile.");
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoadingProfile(false);
-        }
-      }
-    }
-
-    loadAthlete();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user]);
 
   const profile = athlete?.profile;
   const powerProfile = athlete?.powerProfile;
@@ -146,56 +113,52 @@ export default function ProfilePage() {
   async function handleSavePower() {
     if (!user) return;
 
-      const oneMinute = Number(oneMinutePower);
-      const fiveMinute = Number(fiveMinutePower);
-      const twelveMinute = Number(twelveMinutePower);
+    const oneMinute = Number(oneMinutePower);
+    const fiveMinute = Number(fiveMinutePower);
+    const twelveMinute = Number(twelveMinutePower);
 
-      if (
-        !Number.isFinite(oneMinute) ||
-        !Number.isFinite(fiveMinute) ||
-        !Number.isFinite(twelveMinute) ||
-        oneMinute <= 0 ||
-        fiveMinute <= 0 ||
-        twelveMinute <= 0
-      ) {
-        setPowerError("Enter valid power values greater than 0.");
-        return;
-      }
-
-      try {
-        setIsSavingPower(true);
-        setPowerError(null);
-
-        const updatedPowerProfile =
-          await updatePowerProfile(user.id, {
-            one_minute_watts: oneMinute,
-            five_minute_watts: fiveMinute,
-            twelve_minute_watts: twelveMinute,
-          });
-
-        setAthlete((current) => {
-          if (!current) return current;
-
-          return {
-            ...current,
-            powerProfile: updatedPowerProfile,
-          };
-        });
-
-        setIsEditingPower(false);
-      } catch (error) {
-        console.error(
-          "Failed to update power profile:",
-          error
-        );
-
-        setPowerError(
-          "Unable to update your power profile. Please try again."
-        );
-      } finally {
-        setIsSavingPower(false);
-      }
+    if (
+      !Number.isFinite(oneMinute) ||
+      !Number.isFinite(fiveMinute) ||
+      !Number.isFinite(twelveMinute) ||
+      oneMinute <= 0 ||
+      fiveMinute <= 0 ||
+      twelveMinute <= 0
+    ) {
+      setPowerError("Enter valid power values greater than 0.");
+      return;
     }
+
+    try {
+      setIsSavingPower(true);
+      setPowerError(null);
+
+      const updatedPowerProfile = await updatePowerProfile(user.id, {
+        one_minute_watts: oneMinute,
+        five_minute_watts: fiveMinute,
+        twelve_minute_watts: twelveMinute,
+      });
+
+      setAthlete((current) => {
+        if (!current) return current;
+
+        return {
+          ...current,
+          powerProfile: updatedPowerProfile,
+        };
+      });
+
+      setIsEditingPower(false);
+    } catch (error) {
+      console.error("Failed to update power profile:", error);
+
+      setPowerError(
+        "Unable to update your power profile. Please try again."
+      );
+    } finally {
+      setIsSavingPower(false);
+    }
+  }
 
   async function handleSignOut() {
     if (isSigningOut) return;

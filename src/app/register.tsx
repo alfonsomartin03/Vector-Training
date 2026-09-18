@@ -1,6 +1,7 @@
 import DateTimePicker from "@react-native-community/datetimepicker";
+import type { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { router } from "expo-router";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Animated,
   KeyboardAvoidingView,
@@ -125,8 +126,8 @@ export default function RegisterScreen() {
   const [submitError, setSubmitError] =
     useState<string | null>(null);
 
-  const opacity = useRef(new Animated.Value(1)).current;
-  const translateX = useRef(new Animated.Value(0)).current;
+  const [opacity] = useState(() => new Animated.Value(1));
+  const [translateX] = useState(() => new Animated.Value(0));
 
   /* ------------------------------------------------------------------------ */
   /*                                Validation                                */
@@ -289,11 +290,6 @@ export default function RegisterScreen() {
        */
       setCreatedUserId(authData.user.id);
 
-      console.log(
-        "Supabase Auth account created:",
-        authData.user.id
-      );
-
       animateToStep(1);
     } catch (error) {
       console.error(
@@ -427,11 +423,6 @@ export default function RegisterScreen() {
 
         return;
       }
-
-      console.log(
-        "Vector registration completed:",
-        userId
-      );
 
       router.replace("/dashboard");
     } catch (error) {
@@ -1057,7 +1048,7 @@ function AthleteStep({
 }) {
   const updatePhys = (
     field: keyof RegistrationData["physiological"],
-    value: any
+    value: string
   ) => {
     setData((prev) => ({
       ...prev,
@@ -1316,7 +1307,7 @@ function BirthdayPicker({
   ).padStart(2, "0")}`;
 
   const handleNativeChange = (
-    _event: any,
+    _event: DateTimePickerEvent,
     date?: Date
   ) => {
     if (
@@ -1523,7 +1514,7 @@ function PowerStep({
 
   const updatePower = (
     field: keyof RegistrationData["powerProfile"],
-    value: any
+    value: string | boolean
   ) => {
     setData((prev) => ({
       ...prev,
@@ -1867,9 +1858,7 @@ function OptionRow({
 
   selected: string;
 
-  onSelect: (
-    value: any
-  ) => void;
+  onSelect: (value: string) => void;
 }) {
   return (
     <View
@@ -1933,9 +1922,7 @@ function OptionColumn({
 
   selected: string;
 
-  onSelect: (
-    value: any
-  ) => void;
+  onSelect: (value: string) => void;
 }) {
   return (
     <View

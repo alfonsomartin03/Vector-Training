@@ -33,7 +33,7 @@ export default function TrainingPage() {
             </Text>
 
             <Text style={styles.title}>
-              This week's direction.
+              This week’s direction.
             </Text>
 
             <Text style={styles.subtitle}>
@@ -135,7 +135,7 @@ export default function TrainingPage() {
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>
-              Today's session
+              Today’s session
             </Text>
           </View>
 

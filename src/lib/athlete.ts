@@ -1,9 +1,9 @@
 import type {
     AthleteData,
-  AthleteProfile,
-  LactateTest,
-  PowerProfile,
-  Vo2MaxTest,
+    AthleteProfile,
+    LactateTest,
+    PowerProfile,
+    Vo2MaxTest,
 } from "../types/athlete";
 
 import { supabase } from "./supabase";

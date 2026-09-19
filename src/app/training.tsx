@@ -1,15 +1,44 @@
+import { router } from "expo-router";
+import { useMemo, useState } from "react";
 import {
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
 } from "react-native";
 
-import { router } from "expo-router";
 import { theme } from "../constants/theme";
+import {
+  buildWeeklyTrainingPlan,
+  resolveDayWorkout,
+  type TrainingDayPlan,
+  type WorkoutAssignmentsByDate,
+} from "../lib/training/weeklyPlan";
+
+// Future prescriptions can populate this map from the workout library.
+const WORKOUT_ASSIGNMENTS: WorkoutAssignmentsByDate = {};
+
+const CURRENT_FOCUS = {
+  id: "aerobic-development",
+  title: "Aerobic development",
+  description:
+    "Build maximal aerobic power while maintaining the aerobic volume supporting your current Critical Power.",
+};
 
 export default function TrainingPage() {
+  const { width } = useWindowDimensions();
+  const compact = width < 680;
+  const week = useMemo(
+    () => buildWeeklyTrainingPlan(new Date(), WORKOUT_ASSIGNMENTS),
+    []
+  );
+  const today = week.days.find((day) => day.isToday) ?? week.days[0];
+  const [selectedDateKey, setSelectedDateKey] = useState(today.dateKey);
+  const selectedDay =
+    week.days.find((day) => day.dateKey === selectedDateKey) ?? today;
+
   return (
     <View style={styles.page}>
       <ScrollView
@@ -19,169 +48,76 @@ export default function TrainingPage() {
         <View style={styles.container}>
           <View style={styles.header}>
             <Pressable onPress={() => router.push("/")}>
-                        <Text style={styles.logo}>VECTOR</Text>
-                        </Pressable>
-
-            <View style={styles.avatar}>
+              <Text style={styles.logo}>VECTOR</Text>
+            </Pressable>
+            <Pressable style={styles.avatar} onPress={() => router.push("/profile")}>
               <Text style={styles.avatarText}>A</Text>
-            </View>
+            </Pressable>
           </View>
 
           <View style={styles.hero}>
-            <Text style={styles.eyebrow}>
-              TRAINING
-            </Text>
-
-            <Text style={styles.title}>
+            <Text style={styles.eyebrow}>TRAINING</Text>
+            <Text style={[styles.title, compact ? styles.titleCompact : undefined]}>
               This week’s direction.
             </Text>
-
             <Text style={styles.subtitle}>
-              Training is currently focused on raising your aerobic ceiling.
+              A clear view of your focus and daily plan.
             </Text>
           </View>
 
-          <View style={styles.focusCard}>
+          <View style={[styles.focusCard, compact ? styles.focusCardCompact : undefined]}>
             <View style={styles.focusContent}>
-              <Text style={styles.focusEyebrow}>
-                CURRENT FOCUS
-              </Text>
-
-              <Text style={styles.focusTitle}>
-                Aerobic development
-              </Text>
-
-              <Text style={styles.focusDescription}>
-                Build maximal aerobic power while maintaining the aerobic
-                volume supporting your current Critical Power.
-              </Text>
+              <Text style={styles.focusEyebrow}>CURRENT FOCUS</Text>
+              <Text style={styles.focusTitle}>{CURRENT_FOCUS.title}</Text>
+              <Text style={styles.focusDescription}>{CURRENT_FOCUS.description}</Text>
             </View>
-
-            <View style={styles.focusScore}>
-              <Text style={styles.focusScoreNumber}>
-                72%
-              </Text>
-
-              <Text style={styles.focusScoreLabel}>
-                weekly load
-              </Text>
+            <View style={styles.focusPill}>
+              <Text style={styles.focusPillText}>WORKOUT DRIVER</Text>
             </View>
           </View>
 
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>
-              This week
-            </Text>
-
+            <View>
+              <Text style={styles.sectionEyebrow}>CURRENT CALENDAR</Text>
+              <Text style={styles.sectionTitle}>This week</Text>
+            </View>
             <Text style={styles.weekText}>
-              Sep 7 – Sep 13
+              {formatWeekRange(week.startDate, week.endDate)}
             </Text>
           </View>
 
           <View style={styles.week}>
-            <Day
-              day="MON"
-              date="07"
-              title="Endurance"
-              detail="1h 30m · Z2"
-              completed
-            />
-
-            <Day
-              day="TUE"
-              date="08"
-              title="5 × 4 min VO₂"
-              detail="1h 20m · Key session"
-              active
-            />
-
-            <Day
-              day="WED"
-              date="09"
-              title="Rest day"
-              detail="Recovery"
-              muted
-            />
-
-            <Day
-              day="THU"
-              date="10"
-              title="Aerobic endurance"
-              detail="2h 00m · Z2"
-            />
-
-            <Day
-              day="FRI"
-              date="11"
-              title="Threshold"
-              detail="3 × 12 min · CP development"
-            />
-
-            <Day
-              day="SAT"
-              date="12"
-              title="Durability"
-              detail="3h 30m · Endurance"
-            />
-
-            <Day
-              day="SUN"
-              date="13"
-              title="Recovery"
-              detail="1h 00m · Easy"
-              muted
-            />
+            {week.days.map((day) => (
+              <Day
+                key={day.dateKey}
+                day={day}
+                selected={day.dateKey === selectedDay.dateKey}
+                onPress={() => setSelectedDateKey(day.dateKey)}
+              />
+            ))}
           </View>
 
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>
-              Today’s session
-            </Text>
+            <View>
+              <Text style={styles.sectionEyebrow}>
+                {selectedDay.isToday
+                  ? "TODAY"
+                  : formatFullDate(selectedDay.date).toUpperCase()}
+              </Text>
+              <Text style={styles.sectionTitle}>Daily plan</Text>
+            </View>
           </View>
 
-          <View style={styles.sessionCard}>
-            <View style={styles.sessionTop}>
-              <View>
-                <Text style={styles.sessionEyebrow}>
-                  AEROBIC DEVELOPMENT
-                </Text>
+          <DailyPlan day={selectedDay} />
 
-                <Text style={styles.sessionTitle}>
-                  5 × 4 min VO₂
-                </Text>
-              </View>
-
-              <View style={styles.keyPill}>
-                <Text style={styles.keyText}>
-                  Key session
-                </Text>
-              </View>
-            </View>
-
-            <Text style={styles.sessionDescription}>
-              Controlled severe-domain work designed to maximize time near
-              your aerobic ceiling without excessive anaerobic contribution.
-            </Text>
-
-            <View style={styles.stats}>
-              <Stat label="Duration" value="1h 20m" />
-              <Stat label="Target" value="340–355 W" />
-              <Stat label="Work" value="20 min" />
-              <Stat label="Fuel" value="60–80 g/h" />
-            </View>
-
-            <View style={styles.workoutGraph}>
-              <Block width={54} height={20} />
-              <Block width={26} height={52} />
-              <Block width={14} height={12} recovery />
-              <Block width={26} height={52} />
-              <Block width={14} height={12} recovery />
-              <Block width={26} height={52} />
-              <Block width={14} height={12} recovery />
-              <Block width={26} height={52} />
-              <Block width={14} height={12} recovery />
-              <Block width={26} height={52} />
-              <Block width={68} height={18} />
+          <View style={styles.planningNote}>
+            <View style={styles.planningMarker} />
+            <View style={styles.planningCopy}>
+              <Text style={styles.sectionEyebrow}>PRESCRIPTION FOUNDATION</Text>
+              <Text style={styles.planningTitle}>Focus will shape the week.</Text>
+              <Text style={styles.planningText}>
+                The current focus is the input future workout selection will use. Rider weak-point analysis will later update that focus from power-distribution and VO₂ data.
+              </Text>
             </View>
           </View>
         </View>
@@ -192,239 +128,196 @@ export default function TrainingPage() {
   );
 }
 
-type DayProps = {
-  day: string;
-  date: string;
-  title: string;
-  detail: string;
-  active?: boolean;
-  muted?: boolean;
-  completed?: boolean;
-};
-
 function Day({
   day,
-  date,
-  title,
-  detail,
-  active,
-  muted,
-  completed,
-}: DayProps) {
+  selected,
+  onPress,
+}: {
+  day: TrainingDayPlan;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const workout = resolveDayWorkout(day);
+
   return (
-    <View
-      style={[
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={({ pressed }) => [
         styles.day,
-        active ? styles.dayActive : undefined,
-        muted ? styles.dayMuted : undefined,
+        day.workout == null ? styles.dayRest : undefined,
+        selected ? styles.daySelected : undefined,
+        pressed ? styles.pressed : undefined,
       ]}
     >
       <View style={styles.dayDate}>
-        <Text
-          style={[
-            styles.dayName,
-            active ? styles.activeDay : undefined,
-          ]}
-        >
-          {day}
+        <Text style={[styles.dayName, day.isToday ? styles.dayNameToday : undefined]}>
+          {formatDayName(day.date)}
         </Text>
-
-        <Text style={styles.dateNumber}>
-          {date}
-        </Text>
+        <Text style={styles.dateNumber}>{day.date.getDate()}</Text>
       </View>
 
       <View style={styles.dayContent}>
-        <Text style={styles.dayTitle}>
-          {title}
-        </Text>
-
-        <Text style={styles.dayDetail}>
-          {detail}
-        </Text>
+        <Text style={styles.dayTitle}>{workout.title}</Text>
+        <Text style={styles.dayDetail}>{workout.detail}</Text>
       </View>
 
-      {completed ? (
-        <Text style={styles.completed}>
-          ✓
-        </Text>
+      {day.isToday ? (
+        <View style={styles.todayPill}>
+          <Text style={styles.todayText}>TODAY</Text>
+        </View>
       ) : null}
-
-      {active ? (
-        <Text style={styles.arrow}>
-          →
-        </Text>
-      ) : null}
-    </View>
-  );
-}
-
-type StatProps = {
-  label: string;
-  value: string;
-};
-
-function Stat({
-  label,
-  value,
-}: StatProps) {
-  return (
-    <View>
-      <Text style={styles.statLabel}>
-        {label}
-      </Text>
-
-      <Text style={styles.statValue}>
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-type BlockProps = {
-  width: number;
-  height: number;
-  recovery?: boolean;
-};
-
-function Block({
-  width,
-  height,
-  recovery,
-}: BlockProps) {
-  return (
-    <View
-      style={[
-        styles.block,
-        recovery ? styles.recoveryBlock : undefined,
-        {
-          width,
-          height,
-        },
-      ]}
-    />
-  );
-}
-
-type NavKey =
-  | "home"
-  | "training"
-  | "power"
-  | "profile";
-
-function BottomNav({
-  active,
-}: {
-  active: NavKey;
-}) {
-  return (
-    <View style={styles.navWrapper}>
-      <View style={styles.nav}>
-        <Nav
-          label="Home"
-          symbol="⌂"
-          active={active === "home"}
-          onPress={() => router.push("/dashboard")}
-        />
-
-        <Nav
-          label="Training"
-          symbol="⌁"
-          active={active === "training"}
-          onPress={() => router.push("/training")}
-        />
-
-        <Nav
-          label="Power"
-          symbol="↗"
-          active={active === "power"}
-          onPress={() => router.push("/power")}
-        />
-
-        <Nav
-          label="Profile"
-          symbol="○"
-          active={active === "profile"}
-          onPress={() => router.push("/profile")}
-        />
-      </View>
-    </View>
-  );
-}
-
-type NavProps = {
-  label: string;
-  symbol: string;
-  active?: boolean;
-  onPress: () => void;
-};
-
-function Nav({
-  label,
-  symbol,
-  active,
-  onPress,
-}: NavProps) {
-  return (
-    <Pressable
-      style={[
-        styles.navItem,
-        active ? styles.navItemActive : undefined,
-      ]}
-      onPress={onPress}
-    >
-      <Text
-        style={[
-          styles.navSymbol,
-          active ? styles.navSymbolActive : undefined,
-        ]}
-      >
-        {symbol}
-      </Text>
-
-      <Text
-        style={[
-          styles.navLabel,
-          active ? styles.navLabelActive : undefined,
-        ]}
-      >
-        {label}
-      </Text>
+      <Text style={[styles.arrow, selected ? styles.arrowSelected : undefined]}>→</Text>
     </Pressable>
   );
 }
 
+function DailyPlan({ day }: { day: TrainingDayPlan }) {
+  const workout = resolveDayWorkout(day);
+  const isRestDay = day.workout == null;
+
+  return (
+    <View style={styles.sessionCard}>
+      <View style={styles.sessionTop}>
+        <View style={styles.sessionHeading}>
+          <Text style={styles.sessionEyebrow}>
+            {isRestDay ? "RECOVERY" : CURRENT_FOCUS.title.toUpperCase()}
+          </Text>
+          <Text style={styles.sessionTitle}>{workout.title}</Text>
+        </View>
+        <View style={styles.statusPill}>
+          <Text style={styles.statusText}>
+            {isRestDay ? "NO WORKOUT ASSIGNED" : "ASSIGNED"}
+          </Text>
+        </View>
+      </View>
+
+      <Text style={styles.sessionDescription}>{workout.description}</Text>
+
+      <View style={styles.sessionMeta}>
+        <Meta label="DATE" value={formatFullDate(day.date)} />
+        <Meta label="TYPE" value={isRestDay ? "Rest Day" : workout.detail} />
+        <Meta
+          label="DURATION"
+          value={
+            workout.durationMinutes == null
+              ? "—"
+              : formatDuration(workout.durationMinutes)
+          }
+        />
+      </View>
+    </View>
+  );
+}
+
+function Meta({ label, value }: { label: string; value: string }) {
+  return (
+    <View>
+      <Text style={styles.metaLabel}>{label}</Text>
+      <Text style={styles.metaValue}>{value}</Text>
+    </View>
+  );
+}
+
+type NavKey = "home" | "training" | "power" | "profile";
+
+function BottomNav({ active }: { active: NavKey }) {
+  const items = [
+    ["⌂", "Home", "/dashboard", "home"],
+    ["⌁", "Training", "/training", "training"],
+    ["↗", "Power", "/power", "power"],
+    ["○", "Profile", "/profile", "profile"],
+  ] as const;
+
+  return (
+    <View style={styles.navWrapper}>
+      <View style={styles.nav}>
+        {items.map(([symbol, label, route, key]) => (
+          <Pressable
+            key={route}
+            onPress={() => router.push(route)}
+            style={[styles.navItem, active === key ? styles.navItemActive : undefined]}
+          >
+            <Text
+              style={[
+                styles.navSymbol,
+                active === key ? styles.navSymbolActive : undefined,
+              ]}
+            >
+              {symbol}
+            </Text>
+            <Text
+              style={[
+                styles.navLabel,
+                active === key ? styles.navLabelActive : undefined,
+              ]}
+            >
+              {label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function formatDayName(date: Date) {
+  return new Intl.DateTimeFormat(undefined, { weekday: "short" })
+    .format(date)
+    .toUpperCase();
+}
+
+function formatFullDate(date: Date) {
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
+function formatWeekRange(startDate: Date, endDate: Date) {
+  const start = new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+  }).format(startDate);
+  const end = new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(endDate);
+  return `${start} – ${end}`;
+}
+
+function formatDuration(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (hours === 0) return `${remainingMinutes} min`;
+  if (remainingMinutes === 0) return `${hours}h`;
+  return `${hours}h ${remainingMinutes}m`;
+}
+
 const styles = StyleSheet.create({
-  page: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-
-  scrollContent: {
-    paddingBottom: 140,
-  },
-
+  page: { flex: 1, backgroundColor: theme.colors.background },
+  scrollContent: { paddingBottom: 140 },
   container: {
     width: "100%",
     maxWidth: 1050,
     alignSelf: "center",
     paddingHorizontal: 24,
   },
-
   header: {
-    height: 90,
+    height: 82,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-
   logo: {
     color: theme.colors.text,
     fontSize: 18,
     fontWeight: "800",
     letterSpacing: 4,
   },
-
   avatar: {
     width: 38,
     height: 38,
@@ -435,274 +328,221 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
-  avatarText: {
-    fontWeight: "700",
-  },
-
-  hero: {
-    paddingTop: 42,
-    paddingBottom: 45,
-  },
-
+  avatarText: { color: theme.colors.text, fontWeight: "700" },
+  hero: { paddingTop: 18, paddingBottom: 25 },
   eyebrow: {
     color: theme.colors.accent,
-    fontSize: 10,
-    fontWeight: "700",
+    fontSize: 9,
+    fontWeight: "800",
     letterSpacing: 1.5,
   },
-
   title: {
     color: theme.colors.text,
-    fontSize: 40,
+    fontSize: 31,
     fontWeight: "700",
-    letterSpacing: -1.5,
-    marginTop: 10,
+    letterSpacing: -1.1,
+    marginTop: 7,
   },
-
-  subtitle: {
-    color: theme.colors.textSecondary,
-    fontSize: 16,
-    marginTop: 10,
-  },
-
+  titleCompact: { fontSize: 27 },
+  subtitle: { color: theme.colors.textSecondary, fontSize: 13, marginTop: 7 },
   focusCard: {
     backgroundColor: theme.colors.text,
-    borderRadius: 22,
-    padding: 28,
+    borderRadius: 20,
+    padding: 22,
     flexDirection: "row",
+    alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: 30,
+    gap: 24,
   },
-
-  focusContent: {
-    flex: 1,
-  },
-
+  focusCardCompact: { flexDirection: "column" },
+  focusContent: { flex: 1 },
   focusEyebrow: {
     color: theme.colors.accent,
     fontSize: 9,
-    fontWeight: "700",
+    fontWeight: "800",
     letterSpacing: 1.3,
   },
-
   focusTitle: {
     color: theme.colors.white,
-    fontSize: 25,
-    fontWeight: "600",
+    fontSize: 22,
+    fontWeight: "700",
     marginTop: 7,
   },
-
   focusDescription: {
     color: "#B6BEBA",
-    fontSize: 14,
-    lineHeight: 22,
-    maxWidth: 620,
-    marginTop: 12,
+    fontSize: 13,
+    lineHeight: 20,
+    maxWidth: 650,
+    marginTop: 9,
   },
-
-  focusScore: {
-    alignItems: "flex-end",
+  focusPill: {
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    backgroundColor: "#24302D",
   },
-
-  focusScoreNumber: {
-    color: theme.colors.white,
-    fontSize: 30,
-    fontWeight: "600",
+  focusPillText: {
+    color: theme.colors.accent,
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 0.8,
   },
-
-  focusScoreLabel: {
-    color: "#777F7B",
-    fontSize: 10,
-    marginTop: 3,
-  },
-
   sectionHeader: {
-    marginTop: 55,
+    marginTop: 42,
     marginBottom: 16,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-end",
+    gap: 18,
   },
-
+  sectionEyebrow: {
+    color: theme.colors.accent,
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 1.1,
+  },
   sectionTitle: {
     color: theme.colors.text,
     fontSize: 24,
-    fontWeight: "600",
+    fontWeight: "700",
+    marginTop: 5,
   },
-
-  weekText: {
-    color: theme.colors.textSecondary,
-    fontSize: 12,
-  },
-
-  week: {
-    gap: 8,
-  },
-
+  weekText: { color: theme.colors.textSecondary, fontSize: 12, textAlign: "right" },
+  week: { gap: 8 },
   day: {
-    minHeight: 78,
+    minHeight: 76,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderRadius: 16,
-    padding: 15,
+    borderRadius: 15,
+    padding: 14,
   },
-
-  dayActive: {
+  dayRest: { backgroundColor: "#FAFBF9" },
+  daySelected: {
     borderColor: theme.colors.accent,
+    backgroundColor: theme.colors.accentSoft,
   },
-
-  dayMuted: {
-    backgroundColor: "#F1F2F0",
-  },
-
-  dayDate: {
-    width: 62,
-  },
-
+  pressed: { opacity: 0.68 },
+  dayDate: { width: 62 },
   dayName: {
     color: theme.colors.textSecondary,
     fontSize: 9,
-    fontWeight: "700",
+    fontWeight: "800",
     letterSpacing: 1,
   },
-
-  activeDay: {
-    color: theme.colors.accent,
-  },
-
+  dayNameToday: { color: theme.colors.accent },
   dateNumber: {
     color: theme.colors.text,
     fontSize: 22,
-    fontWeight: "600",
+    fontWeight: "700",
     marginTop: 2,
   },
-
-  dayContent: {
-    flex: 1,
+  dayContent: { flex: 1 },
+  dayTitle: { color: theme.colors.text, fontSize: 15, fontWeight: "700" },
+  dayDetail: { color: theme.colors.textSecondary, fontSize: 11, marginTop: 4 },
+  todayPill: {
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    backgroundColor: theme.colors.surface,
   },
-
-  dayTitle: {
-    color: theme.colors.text,
-    fontSize: 15,
-    fontWeight: "600",
-  },
-
-  dayDetail: {
-    color: theme.colors.textSecondary,
-    fontSize: 11,
-    marginTop: 4,
-  },
-
-  completed: {
+  todayText: {
     color: theme.colors.accent,
-    fontSize: 18,
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 0.7,
   },
-
-  arrow: {
-    color: theme.colors.accent,
-    fontSize: 20,
-    marginLeft: 12,
-  },
-
+  arrow: { color: theme.colors.textSecondary, fontSize: 18, marginLeft: 12 },
+  arrowSelected: { color: theme.colors.accent },
   sessionCard: {
-    padding: 26,
+    padding: 24,
     borderRadius: 20,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-
-  sessionTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-
+  sessionTop: { flexDirection: "row", justifyContent: "space-between", gap: 18 },
+  sessionHeading: { flex: 1 },
   sessionEyebrow: {
     color: theme.colors.accent,
     fontSize: 9,
-    fontWeight: "700",
+    fontWeight: "800",
     letterSpacing: 1.2,
   },
-
   sessionTitle: {
     color: theme.colors.text,
-    fontSize: 25,
-    fontWeight: "600",
+    fontSize: 24,
+    fontWeight: "700",
     marginTop: 6,
   },
-
-  keyPill: {
+  statusPill: {
     backgroundColor: theme.colors.accentSoft,
-    paddingHorizontal: 11,
+    paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 999,
     alignSelf: "flex-start",
   },
-
-  keyText: {
-    color: theme.colors.accent,
-    fontSize: 9,
-    fontWeight: "700",
-  },
-
+  statusText: { color: theme.colors.accent, fontSize: 8, fontWeight: "800" },
   sessionDescription: {
     color: theme.colors.textSecondary,
     fontSize: 13,
     lineHeight: 21,
-    marginTop: 14,
+    marginTop: 13,
     maxWidth: 700,
   },
-
-  stats: {
+  sessionMeta: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 38,
-    marginTop: 25,
+    marginTop: 24,
+    paddingTop: 18,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
   },
-
-  statLabel: {
+  metaLabel: {
     color: theme.colors.textSecondary,
-    fontSize: 9,
-    textTransform: "uppercase",
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 1,
   },
-
-  statValue: {
+  metaValue: {
     color: theme.colors.text,
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "600",
     marginTop: 4,
   },
-
-  workoutGraph: {
-    height: 60,
+  planningNote: {
     flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 4,
-    marginTop: 30,
-  },
-
-  block: {
-    backgroundColor: theme.colors.accent,
-    borderRadius: 3,
-  },
-
-  recoveryBlock: {
+    gap: 16,
+    marginTop: 38,
+    padding: 22,
+    borderRadius: 18,
     backgroundColor: theme.colors.accentSoft,
   },
-
+  planningMarker: { width: 4, borderRadius: 2, backgroundColor: theme.colors.accent },
+  planningCopy: { flex: 1 },
+  planningTitle: {
+    color: theme.colors.text,
+    fontSize: 18,
+    fontWeight: "700",
+    marginTop: 6,
+  },
+  planningText: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 19,
+    marginTop: 8,
+  },
   navWrapper: {
     position: "absolute",
     left: 0,
     right: 0,
-    bottom: 22,
+    bottom: 18,
     alignItems: "center",
     paddingHorizontal: 18,
   },
-
   nav: {
     width: "100%",
     maxWidth: 520,
@@ -717,7 +557,6 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     boxShadow: "0 8px 24px rgba(0, 0, 0, 0.08)",
   },
-
   navItem: {
     minWidth: 80,
     minHeight: 52,
@@ -725,28 +564,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 18,
   },
-
-  navItemActive: {
-    backgroundColor: theme.colors.accentSoft,
-  },
-
-  navSymbol: {
-    color: theme.colors.textSecondary,
-    fontSize: 18,
-  },
-
-  navSymbolActive: {
-    color: theme.colors.accent,
-  },
-
-  navLabel: {
-    color: theme.colors.textSecondary,
-    fontSize: 10,
-    marginTop: 3,
-  },
-
-  navLabelActive: {
-    color: theme.colors.text,
-    fontWeight: "600",
-  },
+  navItemActive: { backgroundColor: theme.colors.accentSoft },
+  navSymbol: { color: theme.colors.textSecondary, fontSize: 18 },
+  navSymbolActive: { color: theme.colors.accent },
+  navLabel: { color: theme.colors.textSecondary, fontSize: 10, marginTop: 3 },
+  navLabelActive: { color: theme.colors.text, fontWeight: "600" },
 });

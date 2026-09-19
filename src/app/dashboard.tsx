@@ -1,3 +1,5 @@
+import { router } from "expo-router";
+import { useMemo } from "react";
 import {
   Pressable,
   ScrollView,
@@ -7,1132 +9,517 @@ import {
   View,
 } from "react-native";
 
-import { router } from "expo-router";
-import {
-  useMemo,
-} from "react";
-
 import { theme } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
-
 import { useAthleteData } from "../hooks/useAthleteData";
 import { buildAthleteModel } from "../lib/physiology/athleteModel";
+import {
+  buildWeeklyTrainingPlan,
+  CURRENT_TRAINING_FOCUS,
+  CURRENT_WORKOUT_ASSIGNMENTS,
+  resolveDayWorkout,
+} from "../lib/training/weeklyPlan";
 
 export default function DashboardPage() {
   const { width } = useWindowDimensions();
   const { user } = useAuth();
-
-  const isMobile = width < 700;
-
+  const compact = width < 700;
   const { athlete, isLoading, error } = useAthleteData(
     user?.id,
     "Unable to load your athlete profile.",
     "Failed to load dashboard athlete:"
   );
-
-  const model = useMemo(() => {
-    if (!athlete) {
-      return null;
-    }
-
-    return buildAthleteModel(athlete);
-  }, [athlete]);
-
-  const profile = athlete?.profile;
-
-  const firstName =
-    profile?.first_name?.trim() || "Athlete";
-
-  const firstInitial =
-    firstName.charAt(0).toUpperCase();
-
-  const greeting = getGreeting();
-
-  const lastUpdated =
-    formatRecordedDate(
-      model?.recordedAt ?? null
-    );
-
-  const cpWattsPerKg =
-    model
-      ? model.cpWatts /
-        model.inputs.weightKg
-      : null;
+  const model = useMemo(
+    () => (athlete ? buildAthleteModel(athlete) : null),
+    [athlete]
+  );
+  const week = useMemo(
+    () => buildWeeklyTrainingPlan(new Date(), CURRENT_WORKOUT_ASSIGNMENTS),
+    []
+  );
+  const today = week.days.find((day) => day.isToday) ?? week.days[0];
+  const todayWorkout = resolveDayWorkout(today);
+  const firstName = athlete?.profile.first_name?.trim() || "Athlete";
+  const firstInitial = firstName.charAt(0).toUpperCase();
 
   return (
     <View style={styles.page}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={
-          styles.scrollContent
-        }
+        contentContainerStyle={styles.scrollContent}
       >
-        <View
-          style={[
-            styles.container,
-            isMobile
-              ? styles.containerMobile
-              : undefined,
-          ]}
-        >
-          {/* HEADER */}
+        <View style={[styles.container, compact ? styles.containerCompact : undefined]}>
           <View style={styles.header}>
-            <Pressable
-              onPress={() =>
-                router.push("/")
-              }
-            >
-              <Text style={styles.logo}>
-                VECTOR
-              </Text>
+            <Pressable onPress={() => router.push("/")}>
+              <Text style={styles.logo}>VECTOR</Text>
             </Pressable>
-
-            <Pressable
-              style={styles.profileCircle}
-              onPress={() =>
-                router.push("/profile")
-              }
-            >
-              <Text
-                style={styles.profileInitial}
-              >
-                {firstInitial}
-              </Text>
+            <Pressable style={styles.avatar} onPress={() => router.push("/profile")}>
+              <Text style={styles.avatarText}>{firstInitial}</Text>
             </Pressable>
           </View>
 
-          {/* WELCOME */}
-          <View style={styles.welcome}>
-            <Text
-              style={styles.welcomeOverline}
-            >
-              {greeting}
-            </Text>
-
-            <Text
-              style={styles.welcomeTitle}
-            >
+          <View style={styles.hero}>
+            <Text style={styles.heroEyebrow}>{getGreeting()}</Text>
+            <Text style={[styles.heroTitle, compact ? styles.heroTitleCompact : undefined]}>
               Welcome back, {firstName}.
             </Text>
-
-            <Text
-              style={styles.welcomeSubtitle}
-            >
-              {isLoading
-                ? "Loading your current physiology."
-                : model
-                  ? "Your current physiology model is ready."
-                  : "Add maximal power efforts to build your physiology model."}
-            </Text>
+            <Text style={styles.heroSubtitle}>Your physiology and training at a glance.</Text>
           </View>
 
           {error ? (
             <View style={styles.errorCard}>
-              <Text style={styles.errorText}>
-                {error}
-              </Text>
+              <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
 
-          {/* PROFILE HEADER */}
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text
-                style={styles.sectionOverline}
-              >
-                CURRENT PROFILE
-              </Text>
+          <SectionHeader
+            eyebrow="CURRENT PROFILE"
+            title="Your physiology"
+            aside={model ? formatRecordedDate(model.recordedAt) : undefined}
+          />
 
-              <Text
-                style={styles.sectionTitle}
-              >
-                Your physiology
-              </Text>
-            </View>
-
-            {model ? (
-              <View style={styles.updatedPill}>
-                <View
-                  style={styles.updatedDot}
-                />
-
-                <Text
-                  style={styles.updatedText}
-                >
-                  {lastUpdated}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-
-          {/* METRICS */}
-          <View
-            style={[
-              styles.metricsGrid,
-              isMobile
-                ? styles.metricsGridMobile
-                : undefined,
-            ]}
-          >
+          <View style={[styles.metrics, compact ? styles.stack : undefined]}>
             <MetricCard
               label="Critical Power"
-              value={
-                isLoading
-                  ? "..."
-                  : model
-                    ? `${Math.round(
-                        model.cpWatts
-                      )}`
-                    : "—"
-              }
+              value={isLoading ? "..." : model ? `${Math.round(model.cpWatts)}` : "—"}
               unit="W"
-              secondary={
-                cpWattsPerKg != null
-                  ? `${cpWattsPerKg.toFixed(
-                      2
-                    )} W/kg`
-                  : undefined
-              }
-              onPress={() =>
-                router.push("/power")
-              }
+              detail={model ? `${model.cpWattsPerKg.toFixed(2)} W/kg` : "Add power data"}
             />
-
             <MetricCard
               label="W′"
-              value={
-                isLoading
-                  ? "..."
-                  : model
-                    ? model.wPrimeKj.toFixed(
-                        1
-                      )
-                    : "—"
-              }
+              value={isLoading ? "..." : model ? model.wPrimeKj.toFixed(1) : "—"}
               unit="kJ"
-              secondary={
-                model
-                  ? "Anaerobic work capacity"
-                  : undefined
-              }
-              onPress={() =>
-                router.push("/power")
-              }
+              detail={model ? "Work capacity above CP" : "Add power data"}
             />
-
             <MetricCard
-              label={model?.vo2MaxSource === "measured" ? "VO₂max" : "Est. VO₂max"}
-              value={
-                isLoading
-                  ? "..."
-                  : model
-                    ? model.vo2Max.toFixed(1)
-                    : "—"
-              }
+              label="VO₂max"
+              value={isLoading ? "..." : model ? model.vo2Max.toFixed(1) : "—"}
               unit=""
-              secondary={
+              detail={
                 model
                   ? `${model.vo2MaxSource === "measured" ? "Measured" : "Estimated"} · mL/kg/min`
-                  : undefined
-              }
-              onPress={() =>
-                router.push("/power")
+                  : "Add power or lab data"
               }
             />
           </View>
 
-          {/* MODEL STATUS */}
-          <View style={styles.directionCard}>
-            <View style={styles.directionTop}>
-              <View style={styles.directionHeading}>
-                <Text
-                  style={
-                    styles.directionOverline
-                  }
-                >
-                  VECTOR MODEL
-                </Text>
+          <SectionHeader
+            eyebrow="TODAY"
+            title="Daily workout"
+            aside={formatFullDate(today.date)}
+            action="View week →"
+            onPress={() => router.push("/training")}
+          />
 
-                <Text
-                  style={styles.directionTitle}
-                >
-                  {model
-                    ? "Current profile"
-                    : "Profile incomplete"}
-                </Text>
+          <Pressable
+            onPress={() => router.push("/training")}
+            style={({ pressed }) => [
+              styles.workoutCard,
+              pressed ? styles.pressed : undefined,
+            ]}
+          >
+            <View style={[styles.workoutMain, compact ? styles.workoutMainCompact : undefined]}>
+              <View style={styles.workoutIcon}>
+                <Text style={styles.workoutIconText}>○</Text>
               </View>
-
-              <View
-                style={styles.directionIcon}
-              >
-                <Text
-                  style={styles.directionArrow}
-                >
-                  {model ? "↗" : "—"}
-                </Text>
+              <View style={styles.workoutCopy}>
+                <Text style={styles.workoutEyebrow}>{todayWorkout.detail.toUpperCase()}</Text>
+                <Text style={styles.workoutTitle}>{todayWorkout.title}</Text>
+                <Text style={styles.workoutDescription}>{todayWorkout.description}</Text>
               </View>
+              <Text style={styles.workoutArrow}>→</Text>
             </View>
 
-            <Text
-              style={
-                styles.directionDescription
-              }
-            >
-              {model
-                ? `Vector currently estimates your Critical Power at ${Math.round(
-                    model.cpWatts
-                  )} W with ${model.wPrimeKj.toFixed(
-                    1
-                  )} kJ of W′. Your physiology model is derived from your recorded maximal power efforts.`
-                : "Vector needs valid maximal power efforts before it can construct your physiology model."}
-            </Text>
-
-            <View
-              style={styles.directionFooter}
-            >
-              <Text
-                style={
-                  styles.directionFooterLabel
-                }
-              >
-                Model
-              </Text>
-
-              <Text
-                style={
-                  styles.directionFooterValue
-                }
-              >
-                {model
-                  ? "Morton 3-parameter power-duration model"
-                  : "Waiting for power data"}
-              </Text>
+            <View style={[styles.workoutFooter, compact ? styles.workoutFooterCompact : undefined]}>
+              <Meta label="STATUS" value={today.workout ? "Assigned" : "No workout assigned"} />
+              <Meta label="CURRENT FOCUS" value={CURRENT_TRAINING_FOCUS.title} />
+              <Meta label="WEEK" value={formatWeekRange(week.startDate, week.endDate)} />
             </View>
-          </View>
+          </Pressable>
 
-          {/* TRAINING HEADER */}
-          <View style={styles.trainingHeader}>
-            <View>
-              <Text
-                style={styles.sectionOverline}
-              >
-                TRAINING
-              </Text>
-
-              <Text
-                style={styles.sectionTitle}
-              >
-                What’s next
-              </Text>
-            </View>
-
-            <Pressable
-              onPress={() =>
-                router.push("/training")
-              }
-            >
-              <Text style={styles.viewWeek}>
-                View training →
-              </Text>
-            </Pressable>
-          </View>
-
-          {/* TRAINING PLACEHOLDER */}
-          <View style={styles.trainingCard}>
-            <View style={styles.trainingIcon}>
-              <Text
-                style={
-                  styles.trainingIconText
-                }
-              >
-                ↗
-              </Text>
-            </View>
-
-            <View
-              style={styles.trainingContent}
-            >
-              <Text
-                style={
-                  styles.trainingCardOverline
-                }
-              >
-                TRAINING ENGINE
-              </Text>
-
-              <Text
-                style={styles.trainingCardTitle}
-              >
-                Training recommendations
-              </Text>
-
-              <Text
-                style={
-                  styles.trainingCardDescription
-                }
-              >
-                Your physiology data will be
-                used to build individualized
-                training once your training
-                model is configured.
-              </Text>
-
-              <Pressable
-                style={
-                  styles.trainingButton
-                }
-                onPress={() =>
-                  router.push("/training")
-                }
-              >
-                <Text
-                  style={
-                    styles.trainingButtonText
-                  }
-                >
-                  View training
-                </Text>
-
-                <Text
-                  style={
-                    styles.trainingButtonArrow
-                  }
-                >
-                  →
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-
-          {/* VECTOR INSIGHT */}
-          <View style={styles.insight}>
-            <View
-              style={styles.insightMarker}
+          <SectionHeader eyebrow="QUICK ACCESS" title="Keep moving" />
+          <View style={[styles.quickGrid, compact ? styles.stack : undefined]}>
+            <QuickLink
+              symbol="⌁"
+              title="Training week"
+              detail="Review all seven days"
+              onPress={() => router.push("/training")}
             />
-
-            <View
-              style={styles.insightContent}
-            >
-              <Text
-                style={
-                  styles.insightOverline
-                }
-              >
-                VECTOR INSIGHT
-              </Text>
-
-              <Text
-                style={styles.insightText}
-              >
-                {model ? (
-                  <>
-                    Your current model estimates{" "}
-                    <Text
-                      style={
-                        styles.insightHighlight
-                      }
-                    >
-                      {Math.round(
-                        model.cpWatts
-                      )} W
-                    </Text>{" "}
-                    of Critical Power and{" "}
-                    <Text
-                      style={
-                        styles.insightHighlight
-                      }
-                    >
-                      {model.wPrimeKj.toFixed(
-                        1
-                      )} kJ
-                    </Text>{" "}
-                    of W′. As Vector collects
-                    historical profiles, this
-                    area can identify meaningful
-                    changes in your physiology.
-                  </>
-                ) : (
-                  "Add valid power data to begin building your Vector physiology profile."
-                )}
-              </Text>
-            </View>
+            <QuickLink
+              symbol="↗"
+              title="Power & zones"
+              detail="Curve, CP inputs and ride targets"
+              onPress={() => router.push("/power")}
+            />
+            <QuickLink
+              symbol="○"
+              title="Athlete profile"
+              detail="Update body mass and test data"
+              onPress={() => router.push("/profile")}
+            />
           </View>
         </View>
       </ScrollView>
 
-      <BottomNav active="home" />
+      <BottomNav />
     </View>
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*                              Helper Components                             */
-/* -------------------------------------------------------------------------- */
-
-type MetricCardProps = {
-  label: string;
-  value: string;
-  unit: string;
-  secondary?: string;
+function SectionHeader({
+  eyebrow,
+  title,
+  aside,
+  action,
+  onPress,
+}: {
+  eyebrow: string;
+  title: string;
+  aside?: string;
+  action?: string;
   onPress?: () => void;
-};
+}) {
+  return (
+    <View style={styles.sectionHeader}>
+      <View>
+        <Text style={styles.sectionEyebrow}>{eyebrow}</Text>
+        <Text style={styles.sectionTitle}>{title}</Text>
+      </View>
+      {action && onPress ? (
+        <Pressable onPress={onPress}>
+          <Text style={styles.sectionAction}>{action}</Text>
+        </Pressable>
+      ) : aside ? (
+        <Text style={styles.sectionAside}>{aside}</Text>
+      ) : null}
+    </View>
+  );
+}
 
 function MetricCard({
   label,
   value,
   unit,
-  secondary,
-  onPress,
-}: MetricCardProps) {
+  detail,
+}: {
+  label: string;
+  value: string;
+  unit: string;
+  detail: string;
+}) {
   return (
     <Pressable
-      style={styles.metricCard}
-      onPress={onPress}
+      onPress={() => router.push("/power")}
+      style={({ pressed }) => [styles.metricCard, pressed ? styles.pressed : undefined]}
     >
-      <View
-        style={styles.metricCardHeader}
-      >
-        <Text style={styles.metricLabel}>
-          {label}
-        </Text>
-
-        <Text style={styles.metricArrow}>
-          →
-        </Text>
+      <View style={styles.metricHeader}>
+        <Text style={styles.metricLabel}>{label}</Text>
+        <Text style={styles.metricArrow}>→</Text>
       </View>
-
-      <View
-        style={styles.metricValueRow}
-      >
-        <Text style={styles.metricValue}>
-          {value}
-        </Text>
-
-        {unit ? (
-          <Text style={styles.metricUnit}>
-            {unit}
-          </Text>
-        ) : null}
+      <View style={styles.metricReading}>
+        <Text style={styles.metricValue}>{value}</Text>
+        {unit ? <Text style={styles.metricUnit}>{unit}</Text> : null}
       </View>
-
-      <Text
-        style={styles.metricSecondary}
-      >
-        {secondary ?? "Current estimate"}
-      </Text>
-
-      <View style={styles.metricLine}>
-        <View
-          style={styles.metricLineAccent}
-        />
-      </View>
+      <Text style={styles.metricDetail}>{detail}</Text>
+      <View style={styles.metricAccent} />
     </Pressable>
   );
 }
 
-type NavKey =
-  | "home"
-  | "training"
-  | "power"
-  | "profile";
+function QuickLink({
+  symbol,
+  title,
+  detail,
+  onPress,
+}: {
+  symbol: string;
+  title: string;
+  detail: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.quickCard, pressed ? styles.pressed : undefined]}
+    >
+      <View style={styles.quickIcon}>
+        <Text style={styles.quickIconText}>{symbol}</Text>
+      </View>
+      <View style={styles.quickCopy}>
+        <Text style={styles.quickTitle}>{title}</Text>
+        <Text style={styles.quickDetail}>{detail}</Text>
+      </View>
+      <Text style={styles.quickArrow}>→</Text>
+    </Pressable>
+  );
+}
 
-type BottomNavProps = {
-  active: NavKey;
-};
+function Meta({ label, value }: { label: string; value: string }) {
+  return (
+    <View>
+      <Text style={styles.metaLabel}>{label}</Text>
+      <Text style={styles.metaValue}>{value}</Text>
+    </View>
+  );
+}
 
-function BottomNav({
-  active,
-}: BottomNavProps) {
+function BottomNav() {
+  const items = [
+    ["⌂", "Home", "/dashboard"],
+    ["⌁", "Training", "/training"],
+    ["↗", "Power", "/power"],
+    ["○", "Profile", "/profile"],
+  ] as const;
+
   return (
     <View style={styles.navWrapper}>
       <View style={styles.nav}>
-        <Nav
-          symbol="⌂"
-          label="Home"
-          active={active === "home"}
-          onPress={() =>
-            router.push("/dashboard")
-          }
-        />
-
-        <Nav
-          symbol="⌁"
-          label="Training"
-          active={
-            active === "training"
-          }
-          onPress={() =>
-            router.push("/training")
-          }
-        />
-
-        <Nav
-          symbol="↗"
-          label="Power"
-          active={active === "power"}
-          onPress={() =>
-            router.push("/power")
-          }
-        />
-
-        <Nav
-          symbol="○"
-          label="Profile"
-          active={
-            active === "profile"
-          }
-          onPress={() =>
-            router.push("/profile")
-          }
-        />
+        {items.map(([symbol, label, route]) => {
+          const active = route === "/dashboard";
+          return (
+            <Pressable
+              key={route}
+              onPress={() => router.push(route)}
+              style={[styles.navItem, active ? styles.navItemActive : undefined]}
+            >
+              <Text style={[styles.navSymbol, active ? styles.navSymbolActive : undefined]}>
+                {symbol}
+              </Text>
+              <Text style={[styles.navLabel, active ? styles.navLabelActive : undefined]}>
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
     </View>
   );
 }
 
-type NavProps = {
-  symbol: string;
-  label: string;
-  active?: boolean;
-  onPress: () => void;
-};
-
-function Nav({
-  symbol,
-  label,
-  active,
-  onPress,
-}: NavProps) {
-  return (
-    <Pressable
-      style={[
-        styles.navItem,
-        active
-          ? styles.navItemActive
-          : undefined,
-      ]}
-      onPress={onPress}
-    >
-      <Text
-        style={[
-          styles.navSymbol,
-          active
-            ? styles.navSymbolActive
-            : undefined,
-        ]}
-      >
-        {symbol}
-      </Text>
-
-      <Text
-        style={[
-          styles.navLabel,
-          active
-            ? styles.navLabelActive
-            : undefined,
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 function getGreeting() {
   const hour = new Date().getHours();
-
-  if (hour < 12) {
-    return "GOOD MORNING";
-  }
-
-  if (hour < 18) {
-    return "GOOD AFTERNOON";
-  }
-
+  if (hour < 12) return "GOOD MORNING";
+  if (hour < 18) return "GOOD AFTERNOON";
   return "GOOD EVENING";
 }
 
-function formatRecordedDate(
-  recordedAt: string | null
-) {
-  if (!recordedAt) {
-    return "Current";
-  }
-
+function formatRecordedDate(recordedAt: string | null) {
+  if (!recordedAt) return "Current model";
   const date = new Date(recordedAt);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Current";
-  }
-
-  const today = new Date();
-
-  const isToday =
-    date.getFullYear() ===
-      today.getFullYear() &&
-    date.getMonth() ===
-      today.getMonth() &&
-    date.getDate() ===
-      today.getDate();
-
-  if (isToday) {
-    return "Updated today";
-  }
-
-  return `Updated ${date.toLocaleDateString(
-    undefined,
-    {
-      month: "short",
-      day: "numeric",
-    }
-  )}`;
+  if (Number.isNaN(date.getTime())) return "Current model";
+  return `Updated ${date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  })}`;
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                   Styles                                   */
-/* -------------------------------------------------------------------------- */
+function formatFullDate(date: Date) {
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
+function formatWeekRange(startDate: Date, endDate: Date) {
+  const start = new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+  }).format(startDate);
+  const end = new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+  }).format(endDate);
+  return `${start} – ${end}`;
+}
 
 const styles = StyleSheet.create({
-  page: {
-    flex: 1,
-    backgroundColor:
-      theme.colors.background,
-  },
-
-  scrollContent: {
-    paddingBottom: 150,
-  },
-
+  page: { flex: 1, backgroundColor: theme.colors.background },
+  scrollContent: { paddingBottom: 145 },
   container: {
     width: "100%",
     maxWidth: 1100,
     alignSelf: "center",
-    paddingHorizontal: 32,
+    paddingHorizontal: 30,
   },
-
-  containerMobile: {
-    paddingHorizontal: 18,
-  },
-
+  containerCompact: { paddingHorizontal: 18 },
   header: {
-    height: 92,
+    height: 82,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-
   logo: {
     color: theme.colors.text,
     fontSize: 18,
     fontWeight: "800",
     letterSpacing: 4,
   },
-
-  profileCircle: {
+  avatar: {
     width: 38,
     height: 38,
     borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor:
-      theme.colors.surface,
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-
-  profileInitial: {
-    color: theme.colors.text,
-    fontSize: 14,
-    fontWeight: "700",
-  },
-
-  welcome: {
-    paddingTop: 48,
-    paddingBottom: 64,
-  },
-
-  welcomeOverline: {
+  avatarText: { color: theme.colors.text, fontSize: 14, fontWeight: "700" },
+  hero: { paddingTop: 18, paddingBottom: 27 },
+  heroEyebrow: {
     color: theme.colors.accent,
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 1.5,
-    marginBottom: 12,
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 1.4,
   },
-
-  welcomeTitle: {
+  heroTitle: {
     color: theme.colors.text,
-    fontSize: 42,
-    lineHeight: 47,
+    fontSize: 31,
+    lineHeight: 37,
     fontWeight: "700",
-    letterSpacing: -1.6,
+    letterSpacing: -1.1,
+    marginTop: 7,
   },
-
-  welcomeSubtitle: {
-    color:
-      theme.colors.textSecondary,
-    fontSize: 17,
-    marginTop: 12,
-  },
-
+  heroTitleCompact: { fontSize: 27, lineHeight: 33 },
+  heroSubtitle: { color: theme.colors.textSecondary, fontSize: 13, marginTop: 7 },
   errorCard: {
     backgroundColor: "#FDECEC",
-    borderRadius: theme.radius.md,
+    borderRadius: 12,
     padding: 14,
-    marginBottom: 24,
+    marginBottom: 20,
   },
-
-  errorText: {
-    color: "#A64E4E",
-    fontSize: 12,
-  },
-
+  errorText: { color: "#A64E4E", fontSize: 12 },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-end",
-    marginBottom: 20,
+    gap: 18,
+    marginTop: 36,
+    marginBottom: 16,
   },
-
-  sectionOverline: {
-    color:
-      theme.colors.textSecondary,
-    fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 1.4,
-    marginBottom: 6,
+  sectionEyebrow: {
+    color: theme.colors.accent,
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 1.2,
   },
-
   sectionTitle: {
     color: theme.colors.text,
-    fontSize: 26,
-    fontWeight: "600",
-    letterSpacing: -0.7,
-  },
-
-  updatedPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor:
-      theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-
-  updatedDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor:
-      theme.colors.accent,
-  },
-
-  updatedText: {
-    color:
-      theme.colors.textSecondary,
-    fontSize: 11,
-  },
-
-  metricsGrid: {
-    flexDirection: "row",
-    gap: 14,
-  },
-
-  metricsGridMobile: {
-    flexDirection: "column",
-  },
-
-  metricCard: {
-    flex: 1,
-    minHeight: 190,
-    padding: 22,
-    borderRadius: 20,
-    backgroundColor:
-      theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-
-  metricCardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  metricLabel: {
-    color:
-      theme.colors.textSecondary,
-    fontSize: 12,
-  },
-
-  metricArrow: {
-    color: theme.colors.accent,
-    fontSize: 16,
-  },
-
-  metricValueRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    marginTop: 8,
-  },
-
-  metricValue: {
-    color: theme.colors.text,
-    fontSize: 38,
+    fontSize: 24,
     fontWeight: "700",
-    letterSpacing: -1.6,
-  },
-
-  metricUnit: {
-    marginLeft: 5,
-    color:
-      theme.colors.textSecondary,
-    fontSize: 14,
-    fontWeight: "500",
-  },
-
-  metricSecondary: {
-    color:
-      theme.colors.textSecondary,
-    fontSize: 11,
+    letterSpacing: -0.5,
     marginTop: 5,
   },
-
-  metricLine: {
-    height: 4,
-    marginTop: 24,
-    borderRadius: 999,
-    backgroundColor:
-      theme.colors.accentSoft,
-    overflow: "hidden",
+  sectionAside: { color: theme.colors.textSecondary, fontSize: 11, textAlign: "right" },
+  sectionAction: { color: theme.colors.accent, fontSize: 12, fontWeight: "700" },
+  metrics: { flexDirection: "row", gap: 13 },
+  stack: { flexDirection: "column" },
+  metricCard: {
+    flex: 1,
+    minHeight: 168,
+    padding: 20,
+    borderRadius: 18,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
-
-  metricLineAccent: {
-    width: "34%",
-    height: "100%",
-    borderRadius: 999,
-    backgroundColor:
-      theme.colors.accent,
-  },
-
-  directionCard: {
-    marginTop: 18,
-    padding: 28,
-    borderRadius: 22,
-    backgroundColor:
-      theme.colors.text,
-  },
-
-  directionTop: {
+  metricHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
   },
-
-  directionHeading: {
-    flex: 1,
-    paddingRight: 20,
-  },
-
-  directionOverline: {
-    color: "#AEB6B3",
-    fontSize: 10,
+  metricLabel: { color: theme.colors.textSecondary, fontSize: 11, fontWeight: "600" },
+  metricArrow: { color: theme.colors.accent, fontSize: 16 },
+  metricReading: { flexDirection: "row", alignItems: "baseline", marginTop: 13 },
+  metricValue: {
+    color: theme.colors.text,
+    fontSize: 34,
     fontWeight: "700",
-    letterSpacing: 1.5,
+    letterSpacing: -1.3,
   },
-
-  directionTitle: {
-    color: theme.colors.white,
-    fontSize: 27,
-    fontWeight: "600",
-    marginTop: 7,
-    letterSpacing: -0.7,
+  metricUnit: { color: theme.colors.textSecondary, fontSize: 13, marginLeft: 5 },
+  metricDetail: { color: theme.colors.textSecondary, fontSize: 10, marginTop: 4 },
+  metricAccent: {
+    width: 32,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: theme.colors.accent,
+    marginTop: "auto",
   },
-
-  directionIcon: {
+  workoutCard: {
+    borderRadius: 20,
+    padding: 24,
+    backgroundColor: theme.colors.text,
+  },
+  workoutMain: { flexDirection: "row", alignItems: "center", gap: 18 },
+  workoutMainCompact: { alignItems: "flex-start" },
+  workoutIcon: {
     width: 48,
     height: 48,
     borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#24332F",
+    backgroundColor: "#24302D",
   },
-
-  directionArrow: {
+  workoutIconText: { color: theme.colors.accent, fontSize: 24 },
+  workoutCopy: { flex: 1 },
+  workoutEyebrow: {
     color: theme.colors.accent,
-    fontSize: 24,
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 1.2,
   },
-
-  directionDescription: {
-    maxWidth: 720,
+  workoutTitle: { color: theme.colors.white, fontSize: 25, fontWeight: "700", marginTop: 5 },
+  workoutDescription: { color: "#B6BEBA", fontSize: 12, lineHeight: 19, marginTop: 8, maxWidth: 680 },
+  workoutArrow: { color: theme.colors.accent, fontSize: 24 },
+  workoutFooter: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 44,
     marginTop: 22,
-    color: "#BFC5C2",
-    fontSize: 15,
-    lineHeight: 24,
-  },
-
-  directionFooter: {
-    marginTop: 28,
-    paddingTop: 20,
+    paddingTop: 18,
     borderTopWidth: 1,
     borderTopColor: "#2A2E2E",
   },
-
-  directionFooterLabel: {
-    color: "#808785",
-    fontSize: 10,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-  },
-
-  directionFooterValue: {
-    marginTop: 4,
-    color: theme.colors.white,
-    fontSize: 14,
-    fontWeight: "500",
-  },
-
-  trainingHeader: {
+  workoutFooterCompact: { gap: 24 },
+  metaLabel: { color: "#7F8884", fontSize: 8, fontWeight: "800", letterSpacing: 1 },
+  metaValue: { color: theme.colors.white, fontSize: 11, fontWeight: "600", marginTop: 4 },
+  quickGrid: { flexDirection: "row", gap: 12 },
+  quickCard: {
+    flex: 1,
+    minHeight: 104,
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginTop: 70,
-    marginBottom: 20,
-  },
-
-  viewWeek: {
-    color: theme.colors.accent,
-    fontSize: 13,
-    fontWeight: "600",
-  },
-
-  trainingCard: {
-    minHeight: 190,
-    flexDirection: "row",
-    padding: 26,
-    borderRadius: 22,
-    backgroundColor:
-      theme.colors.surface,
+    alignItems: "center",
+    gap: 12,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-
-  trainingIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+  quickIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor:
-      theme.colors.accentSoft,
-    marginRight: 20,
+    backgroundColor: theme.colors.accentSoft,
   },
-
-  trainingIconText: {
-    color: theme.colors.accent,
-    fontSize: 21,
-  },
-
-  trainingContent: {
-    flex: 1,
-  },
-
-  trainingCardOverline: {
-    color:
-      theme.colors.textSecondary,
-    fontSize: 9,
-    fontWeight: "700",
-    letterSpacing: 1,
-  },
-
-  trainingCardTitle: {
-    color: theme.colors.text,
-    fontSize: 22,
-    fontWeight: "600",
-    marginTop: 5,
-  },
-
-  trainingCardDescription: {
-    color:
-      theme.colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 20,
-    marginTop: 9,
-    maxWidth: 620,
-  },
-
-  trainingButton: {
-    alignSelf: "flex-start",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 18,
-  },
-
-  trainingButtonText: {
-    color: theme.colors.accent,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-
-  trainingButtonArrow: {
-    color: theme.colors.accent,
-    fontSize: 17,
-  },
-
-  insight: {
-    flexDirection: "row",
-    marginTop: 22,
-    padding: 24,
-    borderRadius: 18,
-    backgroundColor:
-      theme.colors.accentSoft,
-  },
-
-  insightMarker: {
-    width: 3,
-    borderRadius: 999,
-    backgroundColor:
-      theme.colors.accent,
-    marginRight: 18,
-  },
-
-  insightContent: {
-    flex: 1,
-  },
-
-  insightOverline: {
-    color: theme.colors.accent,
-    fontSize: 9,
-    fontWeight: "700",
-    letterSpacing: 1.2,
-  },
-
-  insightText: {
-    marginTop: 7,
-    color:
-      theme.colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 21,
-  },
-
-  insightHighlight: {
-    color: theme.colors.text,
-    fontWeight: "700",
-  },
-
+  quickIconText: { color: theme.colors.accent, fontSize: 16 },
+  quickCopy: { flex: 1 },
+  quickTitle: { color: theme.colors.text, fontSize: 13, fontWeight: "700" },
+  quickDetail: { color: theme.colors.textSecondary, fontSize: 9, lineHeight: 14, marginTop: 4 },
+  quickArrow: { color: theme.colors.accent, fontSize: 16 },
+  pressed: { opacity: 0.68 },
   navWrapper: {
     position: "absolute",
     left: 0,
     right: 0,
-    bottom: 22,
+    bottom: 18,
     alignItems: "center",
     paddingHorizontal: 18,
   },
-
   nav: {
     width: "100%",
     maxWidth: 520,
@@ -1140,15 +527,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-around",
-    paddingHorizontal: 8,
-    paddingVertical: 7,
+    padding: 7,
     borderRadius: 24,
     backgroundColor: "#FFFFFFF2",
     borderWidth: 1,
-    borderColor: "#E1E4E1",
+    borderColor: theme.colors.border,
     boxShadow: "0 8px 24px rgba(0, 0, 0, 0.08)",
   },
-
   navItem: {
     minWidth: 80,
     minHeight: 52,
@@ -1156,33 +541,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 18,
   },
-
-  navItemActive: {
-    backgroundColor:
-      theme.colors.accentSoft,
-  },
-
-  navSymbol: {
-    color:
-      theme.colors.textSecondary,
-    fontSize: 18,
-    lineHeight: 20,
-  },
-
-  navSymbolActive: {
-    color: theme.colors.accent,
-  },
-
-  navLabel: {
-    color:
-      theme.colors.textSecondary,
-    fontSize: 10,
-    fontWeight: "500",
-    marginTop: 3,
-  },
-
-  navLabelActive: {
-    color: theme.colors.text,
-    fontWeight: "600",
-  },
+  navItemActive: { backgroundColor: theme.colors.accentSoft },
+  navSymbol: { color: theme.colors.textSecondary, fontSize: 18 },
+  navSymbolActive: { color: theme.colors.accent },
+  navLabel: { color: theme.colors.textSecondary, fontSize: 10, marginTop: 3 },
+  navLabelActive: { color: theme.colors.text, fontWeight: "600" },
 });

@@ -12,26 +12,17 @@ import {
 import { theme } from "../constants/theme";
 import {
   buildWeeklyTrainingPlan,
+  CURRENT_TRAINING_FOCUS,
+  CURRENT_WORKOUT_ASSIGNMENTS,
   resolveDayWorkout,
   type TrainingDayPlan,
-  type WorkoutAssignmentsByDate,
 } from "../lib/training/weeklyPlan";
-
-// Future prescriptions can populate this map from the workout library.
-const WORKOUT_ASSIGNMENTS: WorkoutAssignmentsByDate = {};
-
-const CURRENT_FOCUS = {
-  id: "aerobic-development",
-  title: "Aerobic development",
-  description:
-    "Build maximal aerobic power while maintaining the aerobic volume supporting your current Critical Power.",
-};
 
 export default function TrainingPage() {
   const { width } = useWindowDimensions();
   const compact = width < 680;
   const week = useMemo(
-    () => buildWeeklyTrainingPlan(new Date(), WORKOUT_ASSIGNMENTS),
+    () => buildWeeklyTrainingPlan(new Date(), CURRENT_WORKOUT_ASSIGNMENTS),
     []
   );
   const today = week.days.find((day) => day.isToday) ?? week.days[0];
@@ -68,8 +59,10 @@ export default function TrainingPage() {
           <View style={[styles.focusCard, compact ? styles.focusCardCompact : undefined]}>
             <View style={styles.focusContent}>
               <Text style={styles.focusEyebrow}>CURRENT FOCUS</Text>
-              <Text style={styles.focusTitle}>{CURRENT_FOCUS.title}</Text>
-              <Text style={styles.focusDescription}>{CURRENT_FOCUS.description}</Text>
+              <Text style={styles.focusTitle}>{CURRENT_TRAINING_FOCUS.title}</Text>
+              <Text style={styles.focusDescription}>
+                {CURRENT_TRAINING_FOCUS.description}
+              </Text>
             </View>
             <View style={styles.focusPill}>
               <Text style={styles.focusPillText}>WORKOUT DRIVER</Text>
@@ -182,7 +175,7 @@ function DailyPlan({ day }: { day: TrainingDayPlan }) {
       <View style={styles.sessionTop}>
         <View style={styles.sessionHeading}>
           <Text style={styles.sessionEyebrow}>
-            {isRestDay ? "RECOVERY" : CURRENT_FOCUS.title.toUpperCase()}
+            {isRestDay ? "RECOVERY" : CURRENT_TRAINING_FOCUS.title.toUpperCase()}
           </Text>
           <Text style={styles.sessionTitle}>{workout.title}</Text>
         </View>

@@ -29,6 +29,10 @@ export type AthleteModel = {
   vo2MaxSource: "measured" | "estimated";
   vo2MaxRecordedAt: string | null;
 
+  /** Internal-only classification for workout intensity selection. */
+  fitnessLevel: AthleteFitnessLevel;
+  cpWattsPerKg: number;
+
   powerCurve: DisplayPowerCurvePoint[];
 
   inputs: {
@@ -179,6 +183,12 @@ export function buildAthleteModel(
     ? measuredRelativeVo2Max
     : derivedRelativeVo2Max ?? estimatedVo2Max;
 
+  const fitnessClassification = classifyAthleteFitness({
+    vo2Max,
+    cpWatts: criticalPowerModel.cpWatts,
+    weightKg,
+  });
+
   /*
    * Generate Morton's modeled
    * power-duration curve.
@@ -210,6 +220,9 @@ export function buildAthleteModel(
         ? "measured"
         : "estimated",
     vo2MaxRecordedAt: athlete.vo2MaxTest?.test_date ?? null,
+
+    fitnessLevel: fitnessClassification.level,
+    cpWattsPerKg: fitnessClassification.cpWattsPerKg,
 
     powerCurve,
 

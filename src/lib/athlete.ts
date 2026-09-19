@@ -1,5 +1,5 @@
 import type {
-    AthleteData,
+  AthleteData,
   AthleteProfile,
   LactateTest,
   PowerProfile,

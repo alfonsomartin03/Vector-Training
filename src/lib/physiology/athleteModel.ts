@@ -10,6 +10,10 @@ import {
     generateDisplayPowerCurve,
 } from "./powerCurve";
 
+import {
+  classifyAthleteFitness,
+  type AthleteFitnessLevel,
+} from "./fitnessClassification";
 import { estimateVo2Max } from "./vo2Max";
 
 export type AthleteModel = {

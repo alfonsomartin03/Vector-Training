@@ -221,7 +221,7 @@ export default function DashboardPage() {
             />
 
             <MetricCard
-              label="Est. VO₂max"
+              label={model?.vo2MaxSource === "measured" ? "VO₂max" : "Est. VO₂max"}
               value={
                 isLoading
                   ? "..."
@@ -232,7 +232,7 @@ export default function DashboardPage() {
               unit=""
               secondary={
                 model
-                  ? "mL/kg/min"
+                  ? `${model.vo2MaxSource === "measured" ? "Measured" : "Estimated"} · mL/kg/min`
                   : undefined
               }
               onPress={() =>
@@ -1146,14 +1146,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFFF2",
     borderWidth: 1,
     borderColor: "#E1E4E1",
-    shadowColor: "#000000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    elevation: 8,
+    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.08)",
   },
 
   navItem: {

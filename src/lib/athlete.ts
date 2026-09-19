@@ -1,7 +1,9 @@
 import type {
     AthleteData,
-    AthleteProfile,
-    PowerProfile,
+  AthleteProfile,
+  LactateTest,
+  PowerProfile,
+  Vo2MaxTest,
 } from "../types/athlete";
 
 import { supabase } from "./supabase";
@@ -32,10 +34,39 @@ export async function getAthleteData(
     .limit(1)
     .maybeSingle();
 
+  const vo2MaxRequest = supabase
+    .from("vo2max_tests")
+    .select(
+      "id, user_id, relative_vo2max, absolute_vo2_l_min, body_mass_kg, vt1_power_watts, vt2_power_watts, max_aerobic_power_watts, test_date, source, created_at"
+    )
+    .eq("user_id", userId)
+    .order("test_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const lactateRequest = supabase
+    .from("lactate_tests")
+    .select(
+      "id, user_id, lt1_power_watts, lt1_heart_rate_bpm, lt1_lactate_mmol, lt2_power_watts, lt2_heart_rate_bpm, lt2_lactate_mmol, test_date, source, created_at"
+    )
+    .eq("user_id", userId)
+    .order("test_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   const [
     { data: profile, error: profileError },
     { data: powerProfile, error: powerProfileError },
-  ] = await Promise.all([profileRequest, powerProfileRequest]);
+    { data: vo2MaxTest, error: vo2MaxError },
+    { data: lactateTest, error: lactateError },
+  ] = await Promise.all([
+    profileRequest,
+    powerProfileRequest,
+    vo2MaxRequest,
+    lactateRequest,
+  ]);
 
   if (profileError) {
     throw new Error(
@@ -49,10 +80,24 @@ export async function getAthleteData(
     );
   }
 
+  if (vo2MaxError && !isMissingRelationError(vo2MaxError.code)) {
+    throw new Error(`Unable to load VO₂max data: ${vo2MaxError.message}`);
+  }
+
+  if (lactateError && !isMissingRelationError(lactateError.code)) {
+    throw new Error(`Unable to load lactate data: ${lactateError.message}`);
+  }
+
   return {
     profile: profile as AthleteProfile,
     powerProfile: powerProfile as PowerProfile | null,
+    vo2MaxTest: (vo2MaxTest as Vo2MaxTest | null) ?? null,
+    lactateTest: (lactateTest as LactateTest | null) ?? null,
   };
+}
+
+function isMissingRelationError(code: string | undefined) {
+  return code === "42P01" || code === "PGRST205";
 }
 
 export type PowerProfileUpdate = {
@@ -87,4 +132,64 @@ export async function updatePowerProfile(
   }
 
   return data as PowerProfile;
+}
+
+export type Vo2MaxTestInput = {
+  relative_vo2max: number | null;
+  absolute_vo2_l_min: number | null;
+  body_mass_kg: number | null;
+  vt1_power_watts: number | null;
+  vt2_power_watts: number | null;
+  max_aerobic_power_watts: number | null;
+  test_date: string;
+  source: string;
+};
+
+export async function saveVo2MaxTest(
+  userId: string,
+  values: Vo2MaxTestInput
+): Promise<Vo2MaxTest> {
+  const { data, error } = await supabase
+    .from("vo2max_tests")
+    .insert({ user_id: userId, ...values })
+    .select(
+      "id, user_id, relative_vo2max, absolute_vo2_l_min, body_mass_kg, vt1_power_watts, vt2_power_watts, max_aerobic_power_watts, test_date, source, created_at"
+    )
+    .single();
+
+  if (error) {
+    throw new Error(`Unable to save VO₂max test: ${error.message}`);
+  }
+
+  return data as Vo2MaxTest;
+}
+
+export type LactateTestInput = {
+  lt1_power_watts: number | null;
+  lt1_heart_rate_bpm: number | null;
+  lt1_lactate_mmol: number | null;
+  lt2_power_watts: number | null;
+  lt2_heart_rate_bpm: number | null;
+  lt2_lactate_mmol: number | null;
+  test_date: string;
+  source: string;
+};
+
+export async function saveLactateTest(
+  userId: string,
+  values: LactateTestInput
+): Promise<LactateTest> {
+  const { data, error } = await supabase
+    .from("lactate_tests")
+    .insert({ user_id: userId, ...values })
+    .select(
+      "id, user_id, lt1_power_watts, lt1_heart_rate_bpm, lt1_lactate_mmol, lt2_power_watts, lt2_heart_rate_bpm, lt2_lactate_mmol, test_date, source, created_at"
+    )
+    .single();
+
+  if (error) {
+    throw new Error(`Unable to save lactate test: ${error.message}`);
+  }
+
+  return data as LactateTest;
 }

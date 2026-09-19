@@ -715,14 +715,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFFF2",
     borderWidth: 1,
     borderColor: theme.colors.border,
-    shadowColor: "#000000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    elevation: 8,
+    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.08)",
   },
 
   navItem: {

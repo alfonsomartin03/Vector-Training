@@ -18,6 +18,8 @@ npm run web
 
 Set the two Supabase values in `.env` before starting. Use `npm run typecheck` and `npm run lint` before committing changes.
 
+Database changes are versioned in `supabase/migrations`. Apply pending migrations to the linked Supabase project before deploying application code that depends on them, either with the Supabase CLI or through the project SQL editor.
+
 ---
 
 ## Why This Is Different

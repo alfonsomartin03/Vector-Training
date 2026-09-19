@@ -12,6 +12,7 @@ import Svg, {
 } from "react-native-svg";
 
 import { theme } from "../../constants/theme";
+import { predictPowerAtDuration } from "../../lib/physiology/criticalPower";
 import { generateDetailedPowerCurve } from "../../lib/physiology/powerCurve";
 import type { AthleteModel } from "../../lib/physiology/athleteModel";
 
@@ -52,9 +53,11 @@ export function PowerDurationChart({ model }: Props) {
     [model]
   );
   const [selectedDuration, setSelectedDuration] = useState(300);
-  const selected =
-    observations.find((point) => point.durationSeconds === selectedDuration) ??
-    observations[1];
+  const [chartWidth, setChartWidth] = useState(0);
+  const selectedPower = predictPowerAtDuration(model, selectedDuration);
+  const selectedObservation = observations.find(
+    (point) => point.durationSeconds === selectedDuration
+  );
 
   const curve = useMemo(
     () => generateDetailedPowerCurve(model, 60, 3600, 80),
@@ -97,20 +100,45 @@ export function PowerDurationChart({ model }: Props) {
     Math.round((maximumPower - progress * powerRange) / 10) * 10
   );
 
+  function selectDurationAtPosition(positionX: number) {
+    if (chartWidth <= 0) return;
+
+    const viewBoxX = (positionX / chartWidth) * WIDTH;
+    const plotX = Math.max(
+      PADDING.left,
+      Math.min(WIDTH - PADDING.right, viewBoxX)
+    );
+    const progress = (plotX - PADDING.left) / plotWidth;
+    const duration = Math.exp(
+      logMinimum + progress * (logMaximum - logMinimum)
+    );
+
+    setSelectedDuration(Math.round(duration));
+  }
+
   return (
     <View>
       <View style={styles.inspector}>
         <View>
-          <Text style={styles.inspectorLabel}>SELECTED OBSERVATION</Text>
-          <Text style={styles.inspectorValue}>{selected.label}</Text>
+          <Text style={styles.inspectorLabel}>
+            {selectedObservation ? "MEASURED EFFORT" : "MODELED ESTIMATE"}
+          </Text>
+          <Text style={styles.inspectorValue}>
+            {selectedObservation?.label ?? formatInspectorDuration(selectedDuration)}
+          </Text>
         </View>
         <View style={styles.inspectorReading}>
-          <Text style={styles.inspectorPower}>{Math.round(selected.powerWatts)}</Text>
+          <Text style={styles.inspectorPower}>
+            {Math.round(selectedObservation?.powerWatts ?? selectedPower)}
+          </Text>
           <Text style={styles.inspectorUnit}>W</Text>
         </View>
       </View>
 
-      <View style={styles.svgFrame}>
+      <View
+        style={styles.svgFrame}
+        onLayout={(event) => setChartWidth(event.nativeEvent.layout.width)}
+      >
         <Svg
           width="100%"
           height={HEIGHT}
@@ -179,8 +207,26 @@ export function PowerDurationChart({ model }: Props) {
             strokeLinejoin="round"
           />
 
+          <Line
+            x1={xFor(selectedDuration)}
+            x2={xFor(selectedDuration)}
+            y1={PADDING.top}
+            y2={PADDING.top + plotHeight}
+            stroke={theme.colors.accent}
+            strokeWidth={1.5}
+            strokeDasharray="4 4"
+          />
+          <Circle
+            cx={xFor(selectedDuration)}
+            cy={yFor(selectedPower)}
+            r={7}
+            fill={theme.colors.accent}
+            stroke={theme.colors.surface}
+            strokeWidth={3}
+          />
+
           {observations.map((point) => {
-            const active = point.durationSeconds === selected.durationSeconds;
+            const active = point.durationSeconds === selectedDuration;
 
             return (
               <Circle
@@ -215,11 +261,27 @@ export function PowerDurationChart({ model }: Props) {
             DURATION
           </SvgText>
         </Svg>
+        <View
+          accessible
+          accessibilityLabel={`Power curve estimate: ${Math.round(selectedPower)} watts for ${formatInspectorDuration(selectedDuration)}`}
+          onPointerMove={(event) =>
+            selectDurationAtPosition(event.nativeEvent.offsetX)
+          }
+          onStartShouldSetResponder={() => true}
+          onMoveShouldSetResponder={() => true}
+          onResponderGrant={(event) =>
+            selectDurationAtPosition(event.nativeEvent.locationX)
+          }
+          onResponderMove={(event) =>
+            selectDurationAtPosition(event.nativeEvent.locationX)
+          }
+          style={styles.chartInteractionLayer}
+        />
       </View>
 
       <View style={styles.observationControls}>
         {observations.map((point) => {
-          const active = point.durationSeconds === selected.durationSeconds;
+          const active = point.durationSeconds === selectedDuration;
 
           return (
             <Pressable
@@ -267,6 +329,21 @@ function formatDuration(seconds: number) {
   return seconds < 3600 ? `${seconds / 60}m` : `${seconds / 3600}h`;
 }
 
+function formatInspectorDuration(seconds: number) {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return remainingSeconds === 0
+      ? `${minutes} min`
+      : `${minutes} min ${remainingSeconds}s`;
+  }
+
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.round((seconds % 3600) / 60);
+  return minutes === 0 ? `${hours} hr` : `${hours} hr ${minutes} min`;
+}
+
 const styles = StyleSheet.create({
   inspector: {
     flexDirection: "row",
@@ -305,8 +382,12 @@ const styles = StyleSheet.create({
   },
   svgFrame: {
     width: "100%",
+    position: "relative",
     overflow: "hidden",
     marginTop: 12,
+  },
+  chartInteractionLayer: {
+    ...StyleSheet.absoluteFill,
   },
   legend: {
     flexDirection: "row",

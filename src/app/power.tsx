@@ -9,26 +9,30 @@ import {
   View,
 } from "react-native";
 
-import { PowerDurationChart } from "../components/power/PowerDurationChart";
 import {
   LactateModal,
   PowerProfileModal,
   Vo2MaxModal,
 } from "../components/power/PowerDataModals";
+import { PowerDurationChart } from "../components/power/PowerDurationChart";
 import { theme } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
 import { useAthleteData } from "../hooks/useAthleteData";
-import {
-  saveLactateTest,
-  saveVo2MaxTest,
-  updatePowerProfile,
-} from "../lib/athlete";
 import type {
   LactateTestInput,
   PowerProfileUpdate,
   Vo2MaxTestInput,
 } from "../lib/athlete";
+import {
+  saveLactateTest,
+  saveVo2MaxTest,
+  updatePowerProfile,
+} from "../lib/athlete";
 import { buildAthleteModel } from "../lib/physiology/athleteModel";
+import {
+  buildCriticalPowerZones,
+  type CriticalPowerZone,
+} from "../lib/physiology/trainingZones";
 import type { LactateTest } from "../types/athlete";
 
 export default function PowerPage() {
@@ -45,6 +49,10 @@ export default function PowerPage() {
   const model = useMemo(
     () => (athlete ? buildAthleteModel(athlete) : null),
     [athlete]
+  );
+  const trainingZones = useMemo(
+    () => (model ? buildCriticalPowerZones(model.cpWatts) : []),
+    [model]
   );
   const profile = athlete?.profile;
   const powerProfile = athlete?.powerProfile ?? null;
@@ -143,7 +151,7 @@ export default function PowerPage() {
           <SectionHeader
             eyebrow="POWER-DURATION MODEL"
             title="Current capabilities"
-            aside={model ? "Tap a measured point to inspect" : undefined}
+            aside={model ? "Hover or drag across the curve" : undefined}
           />
 
           <View style={styles.chartCard}>
@@ -166,6 +174,48 @@ export default function PowerPage() {
               <Meta label="OBSERVATIONS" value={powerProfile ? "1m · 5m · 12m" : "None"} />
             </View>
           </View>
+
+          <SectionHeader
+            eyebrow="TRAINING INTENSITY"
+            title="Critical Power zones"
+            aside={model ? `Calculated from ${Math.round(model.cpWatts)} W CP` : undefined}
+          />
+          {model ? (
+            <View style={styles.zonesCard}>
+              <View style={styles.zonesIntro}>
+                <View style={styles.zonesIntroCopy}>
+                  <Text style={styles.cardEyebrow}>RIDE TARGETS</Text>
+                  <Text style={styles.zonesTitle}>Your current power ranges</Text>
+                  <Text style={styles.cardDescription}>
+                    Use these whole-watt targets to pace rides and intervals consistently. They update automatically when your CP model changes.
+                  </Text>
+                </View>
+                <View style={styles.cpBadge}>
+                  <Text style={styles.cpBadgeLabel}>CURRENT CP</Text>
+                  <Text style={styles.cpBadgeValue}>{Math.round(model.cpWatts)} W</Text>
+                </View>
+              </View>
+
+              <View style={styles.zonesList}>
+                {trainingZones.map((zone) => (
+                  <TrainingZoneRow key={zone.id} zone={zone} compact={compact} />
+                ))}
+              </View>
+
+              <Text style={styles.zonesNote}>
+                CP zones are practical training guides, not laboratory thresholds. Terrain, fatigue, heat and session goals may change the best target for a ride.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.zonesCard}>
+              <EmptyState
+                title="Add CP test results to calculate training zones"
+                description="Your 1, 5 and 12-minute maximal efforts are used to create athlete-specific watt ranges."
+                action="Enter CP test results"
+                onPress={() => setEditor("power")}
+              />
+            </View>
+          )}
 
           <SectionHeader eyebrow="CRITICAL POWER TEST" title="Inputs and protocol" />
           <View style={[styles.splitGrid, compact ? styles.stack : undefined]}>
@@ -330,6 +380,52 @@ function MetricCard({
       <Text style={[styles.metricSource, emphasized ? styles.metricSourceActive : undefined]}>
         {source}
       </Text>
+    </View>
+  );
+}
+
+const ZONE_COLORS = [
+  "#9ABEB7",
+  "#64B7A5",
+  "#2FB89D",
+  "#E1A94B",
+  "#E37A52",
+  "#D95454",
+] as const;
+
+function TrainingZoneRow({
+  zone,
+  compact,
+}: {
+  zone: CriticalPowerZone;
+  compact: boolean;
+}) {
+  const wattRange =
+    zone.maxWatts == null
+      ? `${zone.minWatts}+ W`
+      : `${zone.minWatts}–${zone.maxWatts} W`;
+
+  return (
+    <View style={[styles.zoneRow, compact ? styles.zoneRowCompact : undefined]}>
+      <View style={styles.zoneIdentity}>
+        <View
+          style={[
+            styles.zoneMarker,
+            { backgroundColor: ZONE_COLORS[zone.number - 1] },
+          ]}
+        />
+        <View>
+          <Text style={styles.zoneNumber}>ZONE {zone.number}</Text>
+          <Text style={styles.zoneName}>{zone.name}</Text>
+        </View>
+      </View>
+      <Text style={[styles.zonePurpose, compact ? styles.zonePurposeCompact : undefined]}>
+        {zone.purpose}
+      </Text>
+      <View style={styles.zoneTargets}>
+        <Text style={styles.zonePercent}>{zone.percentLabel}</Text>
+        <Text style={styles.zoneWatts}>{wattRange}</Text>
+      </View>
     </View>
   );
 }
@@ -573,6 +669,103 @@ const styles = StyleSheet.create({
   },
   metaLabel: { color: theme.colors.textSecondary, fontSize: 8, fontWeight: "800", letterSpacing: 1 },
   metaValue: { color: theme.colors.text, fontSize: 11, fontWeight: "600", marginTop: 4 },
+  zonesCard: {
+    padding: 24,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+  },
+  zonesIntro: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 20,
+  },
+  zonesIntroCopy: { flex: 1, maxWidth: 650 },
+  zonesTitle: {
+    color: theme.colors.text,
+    fontSize: 22,
+    fontWeight: "700",
+    marginTop: 7,
+  },
+  cpBadge: {
+    minWidth: 112,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: theme.colors.accentSoft,
+  },
+  cpBadgeLabel: {
+    color: theme.colors.accent,
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  cpBadgeValue: {
+    color: theme.colors.text,
+    fontSize: 18,
+    fontWeight: "700",
+    marginTop: 4,
+  },
+  zonesList: {
+    marginTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+  zoneRow: {
+    minHeight: 76,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    paddingVertical: 12,
+  },
+  zoneRowCompact: {
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  zoneIdentity: {
+    width: 170,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  zoneMarker: { width: 5, height: 38, borderRadius: 3 },
+  zoneNumber: {
+    color: theme.colors.textSecondary,
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 0.9,
+  },
+  zoneName: {
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: "700",
+    marginTop: 3,
+  },
+  zonePurpose: {
+    flex: 1,
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  zonePurposeCompact: { flexBasis: "100%", paddingLeft: 17 },
+  zoneTargets: { minWidth: 125, alignItems: "flex-end" },
+  zonePercent: { color: theme.colors.textSecondary, fontSize: 10 },
+  zoneWatts: {
+    color: theme.colors.text,
+    fontSize: 15,
+    fontWeight: "700",
+    marginTop: 4,
+  },
+  zonesNote: {
+    color: theme.colors.textSecondary,
+    fontSize: 10,
+    lineHeight: 16,
+    marginTop: 16,
+  },
   splitGrid: { flexDirection: "row", gap: 18, alignItems: "stretch" },
   card: {
     flex: 1,

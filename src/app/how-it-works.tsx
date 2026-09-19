@@ -1,82 +1,88 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  InformationBullet,
+  InformationCallout,
+  InformationPage,
+  InformationParagraph,
+  InformationSection,
+} from "../components/InformationPage";
 
-import { MarketingHeader } from "../components/MarketingHeader";
-import { theme } from "../constants/theme";
+const SUMMARIES = [
+  {
+    number: "01",
+    title: "Measure",
+    text: "Start with body mass, maximal power efforts, and optional laboratory results.",
+  },
+  {
+    number: "02",
+    title: "Model",
+    text: "Translate those inputs into CP, W′, VO₂max, and a power-duration profile.",
+  },
+  {
+    number: "03",
+    title: "Direct",
+    text: "Use the athlete profile to establish a clear training focus and daily targets.",
+  },
+] as const;
 
 export default function HowItWorksPage() {
   return (
-    <ScrollView
-      style={styles.page}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
+    <InformationPage
+      eyebrow="HOW IT WORKS"
+      title="From athlete data to a clear next step."
+      intro="Vector organizes field testing, laboratory measurements, and training structure into one practical workflow. Every output stays connected to the information that produced it."
+      summaries={[...SUMMARIES]}
     >
-      <View style={styles.container}>
-        <MarketingHeader />
+      <InformationSection eyebrow="STEP 01" title="Build the athlete foundation">
+        <InformationParagraph>
+          Your profile begins with body mass and three maximal cycling efforts: 1 minute, 5 minutes, and 12 minutes. Together, these efforts describe how your power changes as duration increases.
+        </InformationParagraph>
+        <InformationBullet
+          title="Field inputs"
+          text="Record maximal efforts completed with adequate preparation and recovery so the model reflects current capability."
+        />
+        <InformationBullet
+          title="Laboratory inputs"
+          text="Add measured VO₂max, CPET, LT1, or LT2 data when available. Optional fields never prevent the core model from working."
+        />
+      </InformationSection>
 
-        {/* Page content */}
-        <View style={styles.main}>
-          <Text style={styles.eyebrow}>HOW IT WORKS</Text>
+      <InformationSection eyebrow="STEP 02" title="Create the performance model">
+        <InformationParagraph>
+          Vector fits a three-parameter Critical Power model to the maximal efforts. It produces Critical Power, W′, estimated maximal instantaneous power, and a continuous power-duration curve.
+        </InformationParagraph>
+        <InformationParagraph>
+          VO₂max is estimated from power when no laboratory value exists. A valid measured result takes priority, while its source and test date remain visible so estimates are never presented as laboratory measurements.
+        </InformationParagraph>
+      </InformationSection>
 
-          <Text style={styles.title}>
-            From performance data to training direction.
-          </Text>
+      <InformationSection eyebrow="STEP 03" title="Turn physiology into training context">
+        <InformationParagraph>
+          Critical Power becomes the anchor for athlete-specific training zones and ride targets. The current training focus provides the direction that future workout selection will use when placing sessions into the weekly calendar.
+        </InformationParagraph>
+        <InformationBullet
+          title="Today"
+          text="See the assigned session—or a clear recovery day—without searching through the full plan."
+        />
+        <InformationBullet
+          title="This week"
+          text="Each calendar day is an independent assignment slot, ready for workouts from the evolving workout library."
+        />
+      </InformationSection>
 
-          <Text style={styles.body}>
-            Vector builds an athlete profile from your performance data,
-            identifies strengths and potential limiters, and uses that
-            information to guide your current training priority.
-          </Text>
+      <InformationSection eyebrow="STEP 04" title="Reassess as the athlete changes">
+        <InformationParagraph>
+          New power efforts, body mass, or measured VO₂ data rebuild the athlete model automatically. That keeps displayed metrics and training targets synchronized with the latest available inputs.
+        </InformationParagraph>
+        <InformationParagraph>
+          Automated weak-point analysis and workout prescription are still being developed. The current system establishes the transparent data and scheduling foundation those features will use.
+        </InformationParagraph>
+      </InformationSection>
 
-          <Text style={styles.body}>
-            As your fitness changes, your profile can be reassessed so your
-            training direction changes with you.
-          </Text>
-        </View>
-      </View>
-    </ScrollView>
+      <InformationCallout
+        eyebrow="THE PRINCIPLE"
+        title="No metric without context."
+        text="Vector is designed to show where a number came from, whether it was measured or modeled, and how it should influence the athlete’s next decision."
+      />
+    </InformationPage>
   );
 }
-
-const styles = StyleSheet.create({
-  page: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-
-  content: {
-    alignItems: "center",
-  },
-
-  container: {
-    width: "100%",
-    maxWidth: 1120,
-    paddingHorizontal: 24,
-  },
-
-  main: {
-    maxWidth: 850,
-    paddingVertical: 100,
-  },
-
-  eyebrow: {
-    color: theme.colors.accent,
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 1.4,
-  },
-
-  title: {
-    marginTop: 16,
-    color: theme.colors.text,
-    fontSize: 44,
-    lineHeight: 50,
-    fontWeight: "700",
-  },
-
-  body: {
-    marginTop: 24,
-    color: theme.colors.textSecondary,
-    fontSize: 18,
-    lineHeight: 30,
-  },
-});

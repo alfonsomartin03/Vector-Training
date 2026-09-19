@@ -1,82 +1,88 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  InformationBullet,
+  InformationCallout,
+  InformationPage,
+  InformationParagraph,
+  InformationSection,
+} from "../components/InformationPage";
 
-import { MarketingHeader } from "../components/MarketingHeader";
-import { theme } from "../constants/theme";
+const SUMMARIES = [
+  {
+    number: "01",
+    title: "Clarity first",
+    text: "Make complex performance information understandable without hiding its limitations.",
+  },
+  {
+    number: "02",
+    title: "Athlete owned",
+    text: "Keep personal data, measurement sources, and training context centered on the rider.",
+  },
+  {
+    number: "03",
+    title: "Direction over noise",
+    text: "Prioritize the next useful decision instead of adding another crowded dashboard.",
+  },
+] as const;
 
 export default function AboutPage() {
   return (
-    <ScrollView
-      style={styles.page}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
+    <InformationPage
+      eyebrow="ABOUT VECTOR"
+      title="Training data should lead somewhere."
+      intro="Vector is a cycling-performance platform being built to connect athlete physiology, current priorities, and day-to-day training in one understandable system."
+      summaries={[...SUMMARIES]}
     >
-      <View style={styles.container}>
-        <MarketingHeader />
+      <InformationSection eyebrow="THE PROBLEM" title="More data does not automatically create better training">
+        <InformationParagraph>
+          Power meters, laboratory tests, and training platforms can produce an enormous number of metrics. Athletes are often left to decide which number matters, whether it can be trusted, and what to do with it next.
+        </InformationParagraph>
+        <InformationParagraph>
+          Vector’s goal is to reduce that gap: preserve the useful detail, make assumptions visible, and connect the athlete profile to a clear training direction.
+        </InformationParagraph>
+      </InformationSection>
 
-        {/* Page content */}
-        <View style={styles.main}>
-          <Text style={styles.eyebrow}>ABOUT VECTOR</Text>
+      <InformationSection eyebrow="WHAT WE ARE BUILDING" title="One path from testing to the training week">
+        <InformationBullet
+          title="A transparent physiology profile"
+          text="Critical Power, W′, VO₂max, laboratory thresholds, and the power-duration relationship—with measured and estimated sources kept distinct."
+        />
+        <InformationBullet
+          title="Athlete-specific ride targets"
+          text="Practical training zones and exact watt ranges derived from the rider’s current CP model."
+        />
+        <InformationBullet
+          title="A focused weekly plan"
+          text="A real calendar week where each day can hold a prescribed workout or an intentional recovery day."
+        />
+        <InformationBullet
+          title="An evolving prescription engine"
+          text="Future weak-point analysis will compare the athlete’s power distribution and aerobic profile to select an appropriate training focus and workouts."
+        />
+      </InformationSection>
 
-          <Text style={styles.title}>
-            Training should tell you what to do next.
-          </Text>
+      <InformationSection eyebrow="OUR STANDARD" title="Honest about what is measured—and what is modeled">
+        <InformationParagraph>
+          Field models are valuable because they make everyday athlete data actionable. They are also estimates shaped by protocol quality and mathematical assumptions. Vector labels that distinction directly instead of presenting every output with the certainty of a laboratory measurement.
+        </InformationParagraph>
+        <InformationParagraph>
+          When athletes provide valid laboratory data, those measurements take priority where appropriate and remain connected to their date and source.
+        </InformationParagraph>
+      </InformationSection>
 
-          <Text style={styles.body}>
-            Vector is a cycling performance project focused on turning athlete
-            data into clear training priorities.
-          </Text>
+      <InformationSection eyebrow="THE DIRECTION" title="Built to adapt with the rider">
+        <InformationParagraph>
+          Fitness is not static. As power, body mass, laboratory results, and training history change, the athlete model should change too. Vector is building toward plans that respond to those changes without losing the reasoning behind the recommendation.
+        </InformationParagraph>
+        <InformationParagraph>
+          The platform is actively evolving. Current features establish the data model, testing workflow, physiology tools, training calendar, and internal athlete classification needed for more advanced prescription later.
+        </InformationParagraph>
+      </InformationSection>
 
-          <Text style={styles.body}>
-            Instead of simply displaying more metrics, Vector aims to help
-            athletes understand their strengths, weaknesses, and current
-            direction for improvement.
-          </Text>
-        </View>
-      </View>
-    </ScrollView>
+      <InformationCallout
+        eyebrow="WHY VECTOR"
+        title="Understand the athlete. Choose the priority. Build the work."
+        text="That sequence is the product philosophy: training recommendations should be traceable to the athlete profile, simple enough to act on, and flexible enough to evolve."
+      />
+    </InformationPage>
   );
 }
-
-const styles = StyleSheet.create({
-  page: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-
-  content: {
-    alignItems: "center",
-  },
-
-  container: {
-    width: "100%",
-    maxWidth: 1120,
-    paddingHorizontal: 24,
-  },
-
-  main: {
-    maxWidth: 850,
-    paddingVertical: 100,
-  },
-
-  eyebrow: {
-    color: theme.colors.accent,
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 1.4,
-  },
-
-  title: {
-    marginTop: 16,
-    color: theme.colors.text,
-    fontSize: 44,
-    lineHeight: 50,
-    fontWeight: "700",
-  },
-
-  body: {
-    marginTop: 24,
-    color: theme.colors.textSecondary,
-    fontSize: 18,
-    lineHeight: 30,
-  },
-});

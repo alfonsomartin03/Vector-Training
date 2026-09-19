@@ -11,6 +11,41 @@ import { supabase } from "./supabase";
 export async function getAthleteData(
   userId: string
 ): Promise<AthleteData> {
+  try {
+    return await getAthleteDataOnce(userId);
+  } catch (error) {
+    if (!isJwtIssuedAtFutureError(error)) {
+      throw error;
+    }
+
+    const {
+      data: { session: refreshedSession },
+      error: refreshError,
+    } = await supabase.auth.refreshSession();
+
+    if (refreshError || !refreshedSession) {
+      throw new Error(
+        "Your authentication session is out of sync and could not be refreshed. Please sign out and sign in again."
+      );
+    }
+
+    try {
+      return await getAthleteDataOnce(userId);
+    } catch (retryError) {
+      if (isJwtIssuedAtFutureError(retryError)) {
+        throw new Error(
+          "Your authentication session is out of sync. Please sign out and sign in again."
+        );
+      }
+
+      throw retryError;
+    }
+  }
+}
+
+async function getAthleteDataOnce(
+  userId: string
+): Promise<AthleteData> {
   /*
    * Load the athlete's profile.
    *
@@ -98,6 +133,13 @@ export async function getAthleteData(
 
 function isMissingRelationError(code: string | undefined) {
   return code === "42P01" || code === "PGRST205";
+}
+
+function isJwtIssuedAtFutureError(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.toLowerCase().includes("jwt issued at future")
+  );
 }
 
 export type PowerProfileUpdate = {

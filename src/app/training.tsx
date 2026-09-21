@@ -15,7 +15,8 @@ import {
 import { theme } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
 import { useAthleteData } from "../hooks/useAthleteData";
-import { getTrainingFocusDisplay } from "../lib/training/focus";
+import { classifyTrainingFocus, getTrainingFocusDisplay } from "../lib/training/focus";
+import { WorkoutDetails } from "../components/WorkoutDetails";
 import { useTrainingAvailability } from "../hooks/useTrainingAvailability";
 import { TrainingAvailabilityEditor } from "../components/TrainingAvailabilityEditor";
 import { prescribeWeek, weekKey } from "../lib/training/prescription";
@@ -34,6 +35,7 @@ export default function TrainingPage() {
     user?.id, "Unable to load your training focus.", "Failed to load training focus:",
   );
   const focus = getTrainingFocusDisplay(athlete?.profile.training_focus);
+  const currentPower = athlete ? classifyTrainingFocus(athlete) : null;
   const focusTitle = isLoading ? "Loading…" : error ? "Focus unavailable" : focus.title;
   const [weekOffset, setWeekOffset] = useState(0);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
@@ -138,7 +140,7 @@ export default function TrainingPage() {
             </View>
           </View>
 
-          <DailyPlan day={selectedDay} focusTitle={focusTitle} />
+          <DailyPlan day={selectedDay} focusTitle={focusTitle} cp={currentPower?.cpWatts ?? null} p5={currentPower?.fiveMinuteWatts ?? null} />
 
           <View style={styles.planningNote}>
             <View style={styles.planningMarker} />
@@ -217,7 +219,7 @@ function Day({
   );
 }
 
-function DailyPlan({ day, focusTitle }: { day: TrainingDayPlan; focusTitle: string }) {
+function DailyPlan({ day, focusTitle, cp, p5 }: { day: TrainingDayPlan; focusTitle: string; cp: number | null; p5: number | null }) {
   const workout = resolveDayWorkout(day);
   const isRestDay = day.workout == null;
 
@@ -237,7 +239,7 @@ function DailyPlan({ day, focusTitle }: { day: TrainingDayPlan; focusTitle: stri
         </View>
       </View>
 
-      <Text style={styles.sessionDescription}>{workout.description}</Text>
+      {workout.workout ? <WorkoutDetails workout={workout.workout} cp={cp} p5={p5} /> : <Text style={styles.sessionDescription}>{workout.description}</Text>}
 
       <View style={styles.sessionMeta}>
         <Meta label="DATE" value={formatFullDate(day.date)} />

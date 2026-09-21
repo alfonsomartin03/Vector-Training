@@ -28,7 +28,7 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "test:prescription": "node --test tests/prescription.test.cjs tests/availabilityDatabase.test.cjs",
+    "test:prescription": "node --test tests/prescription.test.cjs tests/availabilityDatabase.test.cjs tests/workoutPreview.test.cjs",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",

@@ -38,7 +38,7 @@ import type { LactateTest } from "../types/athlete";
 export default function PowerPage() {
   const { width } = useWindowDimensions();
   const { user } = useAuth();
-  const { athlete, setAthlete, isLoading, error } = useAthleteData(
+  const { athlete, setAthlete, refreshAthlete, isLoading, error } = useAthleteData(
     user?.id,
     "Unable to load your power model.",
     "Failed to load power data:"
@@ -67,6 +67,7 @@ export default function PowerPage() {
     setAthlete((current) =>
       current ? { ...current, powerProfile: saved } : current
     );
+    await refreshAthlete();
   }
 
   async function handleVo2Save(values: Vo2MaxTestInput) {

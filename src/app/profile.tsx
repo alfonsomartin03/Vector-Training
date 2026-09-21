@@ -20,6 +20,7 @@ import {
 import { useAthleteData } from "../hooks/useAthleteData";
 
 import { buildAthleteModel } from "../lib/physiology/athleteModel";
+import { getTrainingFocusDisplay } from "../lib/training/focus";
 
 export default function ProfilePage() {
   const { user, signOut } = useAuth();
@@ -27,6 +28,7 @@ export default function ProfilePage() {
   const {
     athlete,
     setAthlete,
+    refreshAthlete,
     isLoading: isLoadingProfile,
     error: profileError,
   } = useAthleteData(
@@ -48,6 +50,7 @@ export default function ProfilePage() {
   const [twelveMinutePower, setTwelveMinutePower] = useState("");
 
   const profile = athlete?.profile;
+  const focus = getTrainingFocusDisplay(profile?.training_focus);
   const powerProfile = athlete?.powerProfile;
 
   const athleteModel = useMemo(
@@ -144,6 +147,7 @@ export default function ProfilePage() {
         };
       });
 
+      await refreshAthlete();
       setIsEditingPower(false);
     } catch (error) {
       console.error("Failed to update power profile:", error);
@@ -248,6 +252,10 @@ export default function ProfilePage() {
           <Text style={styles.sectionTitle}>Athlete</Text>
 
           <View style={styles.card}>
+            <Row
+              label="Current focus"
+              value={isLoadingProfile ? "..." : profileError ? "Focus unavailable" : focus.title}
+            />
             <Row
               label="Primary sport"
               value={isLoadingProfile ? "..." : sport}

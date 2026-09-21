@@ -7,6 +7,7 @@ import type {
 } from "../types/athlete";
 
 import { supabase } from "./supabase";
+import { classifyTrainingFocus } from "./training/focus";
 
 export async function getAthleteData(
   userId: string
@@ -44,18 +45,17 @@ export async function getAthleteData(
 }
 
 async function getAthleteDataOnce(
-  userId: string
+  userId: string,
+  retries = 1,
 ): Promise<AthleteData> {
   /*
    * Load the athlete's profile.
    *
    * profiles.id is the Supabase Auth user ID.
    */
-  const profileRequest = supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select(
-      "id, first_name, last_name, gender, birth_date, weight_kg, primary_sport, training_history, weekly_volume"
-    )
+    .select("*")
     .eq("id", userId)
     .single();
 
@@ -65,7 +65,8 @@ async function getAthleteDataOnce(
       "id, user_id, one_minute_watts, five_minute_watts, twelve_minute_watts, maximal_efforts_confirmed, recorded_at"
     )
     .eq("user_id", userId)
-    .order("recorded_at", { ascending: false })
+    .order("recorded_at", { ascending: false, nullsFirst: false })
+    .order("id", { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -92,12 +93,10 @@ async function getAthleteDataOnce(
     .maybeSingle();
 
   const [
-    { data: profile, error: profileError },
     { data: powerProfile, error: powerProfileError },
     { data: vo2MaxTest, error: vo2MaxError },
     { data: lactateTest, error: lactateError },
   ] = await Promise.all([
-    profileRequest,
     powerProfileRequest,
     vo2MaxRequest,
     lactateRequest,
@@ -123,12 +122,36 @@ async function getAthleteDataOnce(
     throw new Error(`Unable to load lactate data: ${lactateError.message}`);
   }
 
-  return {
+  const athlete: AthleteData = {
     profile: profile as AthleteProfile,
     powerProfile: powerProfile as PowerProfile | null,
     vo2MaxTest: (vo2MaxTest as Vo2MaxTest | null) ?? null,
     lactateTest: (lactateTest as LactateTest | null) ?? null,
   };
+  const focus = classifyTrainingFocus(athlete);
+  if (athlete.profile.training_focus_revision == null) {
+    console.error("Training focus migration has not been applied to profiles.");
+    return { ...athlete, focusSyncError: "Your training focus is not available yet. Your athlete data is still available." };
+  }
+  const previous = athlete.profile.training_focus;
+  if (previous && (Object.keys(focus) as (keyof typeof focus)[])
+    .every((key) => previous[key] === focus[key])) return athlete;
+  const { data: saved, error: saveError } = await supabase.from("profiles")
+    .update({ training_focus: focus })
+    .eq("id", userId)
+    .eq("training_focus_revision", athlete.profile.training_focus_revision)
+    .select("training_focus, training_focus_tag, training_focus_revision")
+    .maybeSingle();
+  if (!saveError && !saved && retries > 0) return getAthleteDataOnce(userId, retries - 1);
+  if (saveError || !saved) {
+    console.error("Unable to save training focus:", saveError?.message ?? "Power data changed during classification");
+    return {
+      ...athlete,
+      profile: { ...athlete.profile, training_focus: null, training_focus_tag: null },
+      focusSyncError: "Your data loaded, but your current training focus could not be saved. Reopen this page to retry.",
+    };
+  }
+  return { ...athlete, profile: { ...athlete.profile, ...saved } };
 }
 
 function isMissingRelationError(code: string | undefined) {

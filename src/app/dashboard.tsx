@@ -13,9 +13,9 @@ import { theme } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
 import { useAthleteData } from "../hooks/useAthleteData";
 import { buildAthleteModel } from "../lib/physiology/athleteModel";
+import { getTrainingFocusDisplay } from "../lib/training/focus";
 import {
   buildWeeklyTrainingPlan,
-  CURRENT_TRAINING_FOCUS,
   CURRENT_WORKOUT_ASSIGNMENTS,
   resolveDayWorkout,
 } from "../lib/training/weeklyPlan";
@@ -39,6 +39,7 @@ export default function DashboardPage() {
   );
   const today = week.days.find((day) => day.isToday) ?? week.days[0];
   const todayWorkout = resolveDayWorkout(today);
+  const focus = getTrainingFocusDisplay(athlete?.profile.training_focus);
   const firstName = athlete?.profile.first_name?.trim() || "Athlete";
   const firstInitial = firstName.charAt(0).toUpperCase();
 
@@ -132,7 +133,7 @@ export default function DashboardPage() {
 
             <View style={[styles.workoutFooter, compact ? styles.workoutFooterCompact : undefined]}>
               <Meta label="STATUS" value={today.workout ? "Assigned" : "No workout assigned"} />
-              <Meta label="CURRENT FOCUS" value={CURRENT_TRAINING_FOCUS.title} />
+              <Meta label="CURRENT FOCUS" value={isLoading ? "Loading…" : error ? "Focus unavailable" : focus.title} />
               <Meta label="WEEK" value={formatWeekRange(week.startDate, week.endDate)} />
             </View>
           </Pressable>

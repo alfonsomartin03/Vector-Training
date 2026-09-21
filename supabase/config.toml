@@ -1,0 +1,6 @@
+project_id = "vector-training"
+
+[functions.accounts]
+# The handler validates every caller with Auth.getUser, including revoked/deleted users.
+# This also supports projects using asymmetric JWT signing keys.
+verify_jwt = false

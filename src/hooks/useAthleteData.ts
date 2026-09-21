@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useFocusEffect } from "expo-router";
 
 import { getAthleteData } from "../lib/athlete";
 import type { AthleteData } from "../types/athlete";
@@ -12,8 +13,13 @@ export function useAthleteData(
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!userId) return;
+  useFocusEffect(useCallback(() => {
+    if (!userId) {
+      setAthlete(null);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
 
     const athleteUserId = userId;
     let isMounted = true;
@@ -40,7 +46,8 @@ export function useAthleteData(
     return () => {
       isMounted = false;
     };
-  }, [errorMessage, logLabel, userId]);
+  }, [errorMessage, logLabel, userId]));
 
-  return { athlete, setAthlete, isLoading, error };
+  // Never display a previous account's cached profile after sign-out/user switching.
+  return { athlete: athlete?.profile.id === userId ? athlete : null, setAthlete, isLoading, error };
 }

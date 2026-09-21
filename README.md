@@ -20,6 +20,10 @@ Set the two Supabase values in `.env` before starting. Use `npm run typecheck` a
 
 Database changes are versioned in `supabase/migrations`. Apply pending migrations to the linked Supabase project before deploying application code that depends on them, either with the Supabase CLI or through the project SQL editor.
 
+Weekly availability and suggested workouts require the training-availability migration.
+See [prescription setup, policy and limitations](docs/workout-prescription.md).
+Run `npm run test:prescription` for engine and database-ownership checks.
+
 Admin user management and self-service account deletion require the account
 migration and Supabase `accounts` Edge Function. See [admin setup and deployment](docs/admin-accounts.md)
 for first-admin setup, permissions, deletion behavior and validation. Run

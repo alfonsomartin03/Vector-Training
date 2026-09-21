@@ -30,8 +30,11 @@ test("admin migration enforces role isolation, last-admin protection and complet
     await db.exec(readFileSync(path.resolve(__dirname, "../supabase/migrations/20260918213000_add_physiological_tests.sql"), "utf8"));
     await db.exec(readFileSync(path.resolve(__dirname, "../supabase/migrations/20260921160000_add_training_focus.sql"), "utf8"));
     await db.exec(readFileSync(path.resolve(__dirname, "../supabase/migrations/20260921190000_admin_accounts.sql"), "utf8"));
+    await db.exec(readFileSync(path.resolve(__dirname, "../supabase/migrations/20260921210000_training_availability.sql"), "utf8"));
     await db.exec(`
       grant all on all tables in schema public to service_role;
+      insert into public.training_availability(user_id, week_start, weekly_minutes, recent_weekly_minutes, max_session_minutes)
+        values ('${admin}', '2026-09-21', 240, 240, 120), ('${athlete}', '2026-09-21', 180, 180, 90);
       insert into public.vo2max_tests(user_id, relative_vo2max, test_date, source) values ('${admin}', 60, '2026-09-21', 'Test'), ('${athlete}', 50, '2026-09-21', 'Test');
       insert into public.lactate_tests(user_id, lt1_power_watts, test_date, source) values ('${admin}', 250, '2026-09-21', 'Test'), ('${athlete}', 200, '2026-09-21', 'Test');
       insert into public.admin_memberships(user_id) values ('${admin}');
@@ -55,7 +58,7 @@ test("admin migration enforces role isolation, last-admin protection and complet
     assert.equal((await db.query("select count(*) from public.power_profiles where user_id = $1", [admin])).rows[0].count, 1);
     await db.query("insert into public.admin_memberships(user_id) values ($1)", [athlete]);
     await db.query("delete from auth.users where id = $1", [admin]);
-    for (const [table, column] of [["profiles", "id"], ["power_profiles", "user_id"], ["vo2max_tests", "user_id"], ["lactate_tests", "user_id"], ["admin_memberships", "user_id"]]) {
+    for (const [table, column] of [["profiles", "id"], ["power_profiles", "user_id"], ["vo2max_tests", "user_id"], ["lactate_tests", "user_id"], ["admin_memberships", "user_id"], ["training_availability", "user_id"]]) {
       assert.equal(Number((await db.query(`select count(*) from public.${table} where ${column} = $1`, [admin])).rows[0].count), 0, table);
       assert.equal(Number((await db.query(`select count(*) from public.${table} where ${column} = $1`, [athlete])).rows[0].count), 1, `other athlete's ${table} retained`);
     }

@@ -18,6 +18,8 @@ import {
 
 import { supabase } from "@/lib/supabase";
 import { theme } from "../constants/theme";
+import { TrainingAvailabilityEditor } from "../components/TrainingAvailabilityEditor";
+import { validateAvailability, weekKey, type Availability } from "../lib/training/prescription";
 
 /* -------------------------------------------------------------------------- */
 /*                                    Types                                   */
@@ -26,6 +28,7 @@ import { theme } from "../constants/theme";
 type Step = 0 | 1 | 2;
 
 type RegistrationData = {
+  availability: Availability | null;
   account: {
     firstName: string;
     lastName: string;
@@ -61,6 +64,7 @@ type StepProps = {
 /* -------------------------------------------------------------------------- */
 
 const initialRegistrationData: RegistrationData = {
+  availability: null,
   account: {
     firstName: "",
     lastName: "",
@@ -170,7 +174,8 @@ export default function RegisterScreen() {
     data.physiological.birthDate !== "" &&
     Number(data.physiological.weightKg) > 0 &&
     data.physiological.trainingHistory !== "" &&
-    data.physiological.weeklyVolume !== "";
+    data.physiological.weeklyVolume !== "" &&
+    data.availability !== null && !validateAvailability(data.availability);
 
   const powerValid =
     Number(data.powerProfile.oneMinuteWatts) > 0 &&
@@ -342,7 +347,7 @@ export default function RegisterScreen() {
 
       const { error: profileError } = await supabase
         .from("profiles")
-        .insert({
+        .upsert({
           id: userId,
 
           first_name:
@@ -387,6 +392,15 @@ export default function RegisterScreen() {
       /* -------------------------------------------------------------------- */
       /*                          Save Power Profile                           */
       /* -------------------------------------------------------------------- */
+
+      // Profile must exist first (FK). Upserts let a failed save be retried
+      // without colliding with the profile already created by this submission.
+      const { error: availabilityError } = await supabase.from("training_availability")
+        .upsert({ ...data.availability!, user_id: userId, week_start: weekKey() }, { onConflict: "user_id,week_start" });
+      if (availabilityError) {
+        setSubmitError("Your profile exists, but availability could not be saved. Please retry before continuing.");
+        return;
+      }
 
       const { error: powerProfileError } =
         await supabase
@@ -1263,6 +1277,18 @@ function AthleteStep({
             value
           )
         }
+      />
+
+      <TrainingAvailabilityEditor
+        athlete={null}
+        value={data.availability}
+        week={weekKey()}
+        saving={false}
+        onboarding
+        onDirty={() => setData(previous => ({ ...previous, availability: null }))}
+        onSave={async availability => {
+          setData(previous => ({ ...previous, availability }));
+        }}
       />
 
       <NavigationButtons

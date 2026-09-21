@@ -25,6 +25,12 @@ migration and Supabase `accounts` Edge Function. See [admin setup and deployment
 for first-admin setup, permissions, deletion behavior and validation. Run
 `npm run test:admin` for the local account-management tests.
 
+The current training-focus classifier uses three provisional categories, separate
+from fitness level. See [the research and policy](docs/training-focus-research.md)
+for evidence, thresholds, limitations and the required profile migration. Run
+`npm run test:focus` to verify classification and the migration in a local,
+in-memory PostgreSQL database; `npm run test:workouts` covers the workout library.
+
 ---
 
 ## Why This Is Different

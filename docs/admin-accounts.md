@@ -20,9 +20,10 @@ own role. To leave as the sole admin, grant a trusted team member admin access f
 
 ## Deployment
 
-This branch is based on main and does not include the separate tailoring work.
+This branch includes the training-focus classifier from main alongside account management.
 
-1. Apply the existing physiological-test migration if not already applied, then
+1. Apply the existing physiological-test migration and
+   `supabase/migrations/20260921160000_add_training_focus.sql` if not already applied, then
    `supabase/migrations/20260921190000_admin_accounts.sql` using the Supabase SQL
    editor or your authenticated migration workflow. Existing profile and power
    tables must already exist. The migration validates ownership foreign keys;

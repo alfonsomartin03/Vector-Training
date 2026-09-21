@@ -28,6 +28,7 @@ test("admin migration enforces role isolation, last-admin protection and complet
       insert into public.power_profiles(user_id) values ('${admin}'), ('${athlete}');
     `);
     await db.exec(readFileSync(path.resolve(__dirname, "../supabase/migrations/20260918213000_add_physiological_tests.sql"), "utf8"));
+    await db.exec(readFileSync(path.resolve(__dirname, "../supabase/migrations/20260921160000_add_training_focus.sql"), "utf8"));
     await db.exec(readFileSync(path.resolve(__dirname, "../supabase/migrations/20260921190000_admin_accounts.sql"), "utf8"));
     await db.exec(`
       grant all on all tables in schema public to service_role;

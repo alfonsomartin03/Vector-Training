@@ -1,3 +1,5 @@
+import type { TrainingFocusAssessment, TrainingFocusTag } from "../lib/training/focus";
+
 export type NumericDatabaseValue = number | string;
 
 export type AthleteProfile = {
@@ -10,6 +12,9 @@ export type AthleteProfile = {
   primary_sport: string | null;
   training_history: string | null;
   weekly_volume: string | null;
+  training_focus?: TrainingFocusAssessment | null;
+  training_focus_tag?: TrainingFocusTag | null;
+  training_focus_revision?: number;
 };
 
 export type PowerProfile = {
@@ -51,6 +56,7 @@ export type LactateTest = {
 };
 
 export type AthleteData = {
+  focusSyncError?: string;
   profile: AthleteProfile;
   powerProfile: PowerProfile | null;
   vo2MaxTest: Vo2MaxTest | null;

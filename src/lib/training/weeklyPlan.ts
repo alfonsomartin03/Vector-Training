@@ -24,19 +24,6 @@ export type WorkoutAssignmentsByDate = Readonly<
   Record<string, WorkoutAssignment | undefined>
 >;
 
-export type TrainingFocus = {
-  id: string;
-  title: string;
-  description: string;
-};
-
-export const CURRENT_TRAINING_FOCUS: TrainingFocus = {
-  id: "aerobic-development",
-  title: "Aerobic development",
-  description:
-    "Build maximal aerobic power while maintaining the aerobic volume supporting your current Critical Power.",
-};
-
 // This shared source will be replaced by persisted workout assignments later.
 export const CURRENT_WORKOUT_ASSIGNMENTS: WorkoutAssignmentsByDate = {};
 

@@ -74,7 +74,7 @@ export default function HowItWorksPage() {
           New power efforts, body mass, or measured VO₂ data rebuild the athlete model automatically. That keeps displayed metrics and training targets synchronized with the latest available inputs.
         </InformationParagraph>
         <InformationParagraph>
-          Automated weak-point analysis and workout prescription are still being developed. The current system establishes the transparent data and scheduling foundation those features will use.
+          Current power tests update a provisional training focus: sustainable power, aerobic ceiling or balanced development. This comparison is a coaching heuristic, not a confirmed physiological limiter. Individual workout prescription is still being developed.
         </InformationParagraph>
       </InformationSection>
 

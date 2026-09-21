@@ -10,9 +10,11 @@ import {
 } from "react-native";
 
 import { theme } from "../constants/theme";
+import { useAuth } from "../context/AuthContext";
+import { useAthleteData } from "../hooks/useAthleteData";
+import { getTrainingFocusDisplay } from "../lib/training/focus";
 import {
   buildWeeklyTrainingPlan,
-  CURRENT_TRAINING_FOCUS,
   CURRENT_WORKOUT_ASSIGNMENTS,
   resolveDayWorkout,
   type TrainingDayPlan,
@@ -21,6 +23,12 @@ import {
 export default function TrainingPage() {
   const { width } = useWindowDimensions();
   const compact = width < 680;
+  const { user } = useAuth();
+  const { athlete, isLoading, error } = useAthleteData(
+    user?.id, "Unable to load your training focus.", "Failed to load training focus:",
+  );
+  const focus = getTrainingFocusDisplay(athlete?.profile.training_focus);
+  const focusTitle = isLoading ? "Loading…" : error ? "Focus unavailable" : focus.title;
   const week = useMemo(
     () => buildWeeklyTrainingPlan(new Date(), CURRENT_WORKOUT_ASSIGNMENTS),
     []
@@ -59,13 +67,13 @@ export default function TrainingPage() {
           <View style={[styles.focusCard, compact ? styles.focusCardCompact : undefined]}>
             <View style={styles.focusContent}>
               <Text style={styles.focusEyebrow}>CURRENT FOCUS</Text>
-              <Text style={styles.focusTitle}>{CURRENT_TRAINING_FOCUS.title}</Text>
+              <Text style={styles.focusTitle}>{focusTitle}</Text>
               <Text style={styles.focusDescription}>
-                {CURRENT_TRAINING_FOCUS.description}
+                {isLoading ? "Loading your athlete profile…" : error ?? focus.description}
               </Text>
             </View>
             <View style={styles.focusPill}>
-              <Text style={styles.focusPillText}>WORKOUT DRIVER</Text>
+              <Text style={styles.focusPillText}>{athlete?.profile.training_focus?.tag && !error ? "PROVISIONAL FOCUS" : "ASSESSMENT"}</Text>
             </View>
           </View>
 
@@ -101,7 +109,7 @@ export default function TrainingPage() {
             </View>
           </View>
 
-          <DailyPlan day={selectedDay} />
+          <DailyPlan day={selectedDay} focusTitle={focusTitle} />
 
           <View style={styles.planningNote}>
             <View style={styles.planningMarker} />
@@ -109,7 +117,7 @@ export default function TrainingPage() {
               <Text style={styles.sectionEyebrow}>PRESCRIPTION FOUNDATION</Text>
               <Text style={styles.planningTitle}>Focus will shape the week.</Text>
               <Text style={styles.planningText}>
-                The current focus is the input future workout selection will use. Rider weak-point analysis will later update that focus from power-distribution and VO₂ data.
+                Your focus compares sustained power with five-minute power. It guides workout selection; your fitness level, recent training and recovery will determine the dose. It is reassessed when you update your maximal efforts.
               </Text>
             </View>
           </View>
@@ -166,7 +174,7 @@ function Day({
   );
 }
 
-function DailyPlan({ day }: { day: TrainingDayPlan }) {
+function DailyPlan({ day, focusTitle }: { day: TrainingDayPlan; focusTitle: string }) {
   const workout = resolveDayWorkout(day);
   const isRestDay = day.workout == null;
 
@@ -175,7 +183,7 @@ function DailyPlan({ day }: { day: TrainingDayPlan }) {
       <View style={styles.sessionTop}>
         <View style={styles.sessionHeading}>
           <Text style={styles.sessionEyebrow}>
-            {isRestDay ? "RECOVERY" : CURRENT_TRAINING_FOCUS.title.toUpperCase()}
+            {isRestDay ? "RECOVERY" : focusTitle.toUpperCase()}
           </Text>
           <Text style={styles.sessionTitle}>{workout.title}</Text>
         </View>

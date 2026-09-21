@@ -12,6 +12,9 @@ import { router } from "expo-router";
 import { useMemo, useState } from "react";
 
 import { theme } from "../constants/theme";
+import { AccountDeletePanel } from "../components/AccountDeletePanel";
+import { useAdminAccess } from "../hooks/useAdminAccess";
+import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 
 import {
@@ -24,6 +27,7 @@ import { getTrainingFocusDisplay } from "../lib/training/focus";
 
 export default function ProfilePage() {
   const { user, signOut } = useAuth();
+  const { isAdmin } = useAdminAccess();
 
   const {
     athlete,
@@ -374,6 +378,10 @@ export default function ProfilePage() {
               value="••••••••"
             />
 
+            {isAdmin ? <Pressable accessibilityRole="button" style={styles.signOut} onPress={() => router.push("/admin")}>
+              <Text style={styles.signOutText}>Manage users →</Text>
+            </Pressable> : null}
+
             <Pressable
               style={[
                 styles.signOut,
@@ -397,6 +405,16 @@ export default function ProfilePage() {
               </Text>
             ) : null}
           </View>
+          {user ? <AccountDeletePanel
+            userId={user.id}
+            email={user.email ?? null}
+            self
+            onDeleted={async () => {
+              const { error } = await supabase.auth.signOut({ scope: "local" });
+              if (error) throw error;
+              router.replace("/login");
+            }}
+          /> : null}
         </View>
       </ScrollView>
 

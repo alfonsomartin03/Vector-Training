@@ -72,5 +72,6 @@ export function useAthleteData(
     };
   }, [errorMessage, logLabel, userId]));
 
-  return { athlete, setAthlete, refreshAthlete, isLoading, error };
+  // Never display a previous account's cached profile after sign-out/user switching.
+  return { athlete: athlete?.profile.id === userId ? athlete : null, setAthlete, refreshAthlete, isLoading, error };
 }

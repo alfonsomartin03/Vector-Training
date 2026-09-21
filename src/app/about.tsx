@@ -56,7 +56,7 @@ export default function AboutPage() {
         />
         <InformationBullet
           title="An evolving prescription engine"
-          text="Future weak-point analysis will compare the athlete’s power distribution and aerobic profile to select an appropriate training focus and workouts."
+          text="A provisional focus compares Critical Power with five-minute power to suggest sustainable-power, aerobic-ceiling or balanced development. Individual workout dosage is still being developed."
         />
       </InformationSection>
 

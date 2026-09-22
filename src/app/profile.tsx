@@ -277,8 +277,20 @@ export default function ProfilePage() {
               label="Weekly training"
               value={isLoadingProfile ? "..." : trainingVolume}
             />
-            <Row label="Available this week" value={availability.loading ? "..." : availability.error ? "Unavailable" : availability.availability ? `${availability.availability.weekly_minutes / 60} h · ${availability.availability.rest_days.length} preferred rest days` : "Not set"} />
-            <Pressable accessibilityRole="button" onPress={() => router.push("/training")}><Text>Edit weekly availability →</Text></Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Edit weekly availability"
+              onPress={() => router.push("/training")}
+              style={({ pressed }) => [styles.row, styles.availabilityRow, pressed ? styles.availabilityRowPressed : undefined]}
+            >
+              <View style={styles.availabilityRowCopy}>
+                <Text style={styles.rowLabel}>Available this week</Text>
+                <Text style={styles.availabilityAction}>Edit weekly availability →</Text>
+              </View>
+              <Text style={[styles.rowValue, styles.availabilityValue]}>
+                {availability.loading ? "..." : availability.error ? "Unavailable" : availability.availability ? `${availability.availability.weekly_minutes / 60} h · ${availability.availability.rest_days.length} preferred rest days` : "Not set"}
+              </Text>
+            </Pressable>
 
             <Row
               label="Max efforts confirmed"
@@ -899,6 +911,31 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontSize: 12,
     fontWeight: "500",
+  },
+
+  availabilityRow: {
+    gap: 18,
+    paddingVertical: 12,
+  },
+
+  availabilityRowPressed: {
+    backgroundColor: theme.colors.accentSoft,
+  },
+
+  availabilityRowCopy: {
+    flex: 1,
+    gap: 5,
+  },
+
+  availabilityAction: {
+    color: theme.colors.accent,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  availabilityValue: {
+    flexShrink: 1,
+    textAlign: "right",
   },
 
   modelSectionHeader: {

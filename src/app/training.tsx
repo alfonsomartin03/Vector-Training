@@ -39,6 +39,7 @@ export default function TrainingPage() {
   const focusTitle = isLoading ? "Loading…" : error ? "Focus unavailable" : focus.title;
   const [weekOffset, setWeekOffset] = useState(0);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
+  const [dailyPlanOpen, setDailyPlanOpen] = useState(false);
   const reference = new Date();
   reference.setDate(reference.getDate() + weekOffset * 7);
   const selectedWeek = weekKey(reference);
@@ -80,42 +81,79 @@ export default function TrainingPage() {
             </Text>
           </View>
 
-          <View style={[styles.focusCard, compact ? styles.focusCardCompact : undefined]}>
-            <View style={styles.focusContent}>
-              <Text style={styles.focusEyebrow}>CURRENT FOCUS</Text>
-              <Text style={styles.focusTitle}>{focusTitle}</Text>
-              <Text style={styles.focusDescription}>
-                {isLoading ? "Loading your athlete profile…" : error ?? focus.description}
-              </Text>
+          <View style={styles.weekOverview}>
+            <View style={styles.weekOverviewTop}>
+              <View>
+                <Text style={styles.sectionEyebrow}>WEEK OVERVIEW</Text>
+                <Text style={styles.weekOverviewTitle}>{weekOffset === 0 ? "This week" : "Next week"}</Text>
+              </View>
+              <Text style={styles.weekText}>{formatWeekRange(week.startDate, week.endDate)}</Text>
             </View>
-            <View style={styles.focusPill}>
-              <Text style={styles.focusPillText}>{athlete?.profile.training_focus?.tag && !error ? "PROVISIONAL FOCUS" : "ASSESSMENT"}</Text>
+
+            <View style={styles.weekTabs}>
+              <Pressable
+                accessibilityRole="tab"
+                accessibilityState={{ selected: weekOffset === 0 }}
+                disabled={availability.saving}
+                onPress={() => setWeekOffset(0)}
+                style={[styles.weekTab, weekOffset === 0 ? styles.weekTabActive : undefined]}
+              >
+                <Text style={[styles.weekTabText, weekOffset === 0 ? styles.weekTabTextActive : undefined]}>This week</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="tab"
+                accessibilityState={{ selected: weekOffset === 1 }}
+                disabled={availability.saving}
+                onPress={() => setWeekOffset(1)}
+                style={[styles.weekTab, weekOffset === 1 ? styles.weekTabActive : undefined]}
+              >
+                <Text style={[styles.weekTabText, weekOffset === 1 ? styles.weekTabTextActive : undefined]}>Next week</Text>
+              </Pressable>
             </View>
+
+            <View style={styles.overviewStats}>
+              <OverviewStat
+                label="CURRENT FOCUS"
+                value={focusTitle}
+                detail={isLoading ? "Loading your athlete profile…" : error ?? focus.description}
+              />
+              <OverviewStat
+                label="AVAILABILITY"
+                value={availability.loading ? "Loading…" : availability.error ? "Unavailable" : availability.availability ? `${availability.availability.weekly_minutes / 60} h · ${availability.availability.rest_days.length} rest days` : "Not set"}
+                detail="Time and preferred recovery days"
+              />
+              <OverviewStat
+                label="PLANNED LOAD"
+                value={`${Math.round(prescription.totalMinutes)} min · ${prescription.trainingDays} rides`}
+                detail={`${prescription.qualitySessions} focused sessions · ${prescription.qualityMinutes} work min`}
+              />
+            </View>
+
+            {prescription.messages.length ? (
+              <View style={styles.overviewMessages}>
+                {prescription.messages.map((message) => (
+                  <Text key={message} style={styles.overviewMessage}>• {message}</Text>
+                ))}
+              </View>
+            ) : null}
+
+            {availability.error ? (
+              <Pressable accessibilityRole="button" onPress={availability.reload} style={styles.overviewAction}>
+                <Text style={styles.overviewActionText}>Retry availability</Text>
+              </Pressable>
+            ) : athlete ? (
+              <Pressable accessibilityRole="button" onPress={() => setAvailabilityOpen(true)} style={styles.overviewAction}>
+                <Text style={styles.overviewActionText}>Edit weekly availability →</Text>
+              </Pressable>
+            ) : null}
           </View>
 
-          <View style={styles.sectionHeader}>
-            <Pressable accessibilityRole="button" disabled={availability.saving} onPress={() => setWeekOffset(0)}><Text>This week</Text></Pressable>
-            <Pressable accessibilityRole="button" disabled={availability.saving} onPress={() => setWeekOffset(1)}><Text>Next week</Text></Pressable>
-            <Text>{selectedWeek}</Text>
-          </View>
-          {availability.loading ? <Text>Loading availability…</Text> : availability.error ? <View><Text accessibilityRole="alert">{availability.error}</Text><Pressable accessibilityRole="button" onPress={availability.reload}><Text>Retry availability</Text></Pressable></View> : athlete ? <Pressable accessibilityRole="button" onPress={() => setAvailabilityOpen(true)} style={styles.availabilityButton}>
-            <Text style={styles.dayTitle}>{availability.availability ? `${availability.availability.weekly_minutes / 60} h available · ${availability.availability.rest_days.length} preferred rest days` : "Set your weekly availability"}</Text>
-            <Text style={styles.dayDetail}>Edit availability →</Text>
-          </Pressable> : null}
-          <View style={styles.planningNote}><View style={styles.planningCopy}>
-            <Text style={styles.planningTitle}>Suggested stimulus</Text>
-            <Text style={styles.planningText}>{Math.round(prescription.totalMinutes)} min · {prescription.trainingDays} rides · {7 - prescription.trainingDays} rest days · {prescription.qualitySessions} focused sessions ({prescription.qualityMinutes} work min)</Text>
-            {prescription.messages.map(message => <Text key={message} style={styles.planningText}>{message}</Text>)}
-          </View></View>
-
-          <View style={styles.sectionHeader}>
+          <View style={[styles.sectionHeader, styles.calendarHeader]}>
             <View>
               <Text style={styles.sectionEyebrow}>CURRENT CALENDAR</Text>
-              <Text style={styles.sectionTitle}>{weekOffset === 0 ? "This week" : "Next week"}</Text>
+              <Text style={styles.sectionTitle}>Daily schedule</Text>
             </View>
-            <Text style={styles.weekText}>
-              {formatWeekRange(week.startDate, week.endDate)}
-            </Text>
+            <Text style={styles.weekText}>Select a day to view its plan</Text>
           </View>
 
           <View style={styles.week}>
@@ -124,23 +162,13 @@ export default function TrainingPage() {
                 key={day.dateKey}
                 day={day}
                 selected={day.dateKey === selectedDay.dateKey}
-                onPress={() => setSelectedDateKey(day.dateKey)}
+                onPress={() => {
+                  setSelectedDateKey(day.dateKey);
+                  setDailyPlanOpen(true);
+                }}
               />
             ))}
           </View>
-
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionEyebrow}>
-                {selectedDay.isToday
-                  ? "TODAY"
-                  : formatFullDate(selectedDay.date).toUpperCase()}
-              </Text>
-              <Text style={styles.sectionTitle}>Daily plan</Text>
-            </View>
-          </View>
-
-          <DailyPlan day={selectedDay} focusTitle={focusTitle} cp={currentPower?.cpWatts ?? null} p5={currentPower?.fiveMinuteWatts ?? null} />
 
           <View style={styles.planningNote}>
             <View style={styles.planningMarker} />
@@ -170,6 +198,41 @@ export default function TrainingPage() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      <Modal visible={dailyPlanOpen} transparent animationType="fade" onRequestClose={() => setDailyPlanOpen(false)}>
+        <View style={styles.modalBackdrop}>
+          <View accessibilityViewIsModal style={styles.workoutModalCard}>
+            <View style={styles.workoutModalHeader}>
+              <View style={styles.workoutModalHeading}>
+                <Text style={styles.sectionEyebrow}>
+                  {selectedDay.isToday ? "TODAY" : formatFullDate(selectedDay.date).toUpperCase()}
+                </Text>
+                <Text style={styles.workoutModalTitle}>Daily plan</Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close daily plan"
+                onPress={() => setDailyPlanOpen(false)}
+                style={({ pressed }) => [styles.workoutModalClose, pressed ? styles.pressed : undefined]}
+              >
+                <Text style={styles.workoutModalCloseText}>Close</Text>
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.workoutModalContent}>
+              <DailyPlan day={selectedDay} focusTitle={focusTitle} cp={currentPower?.cpWatts ?? null} p5={currentPower?.fiveMinuteWatts ?? null} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+function OverviewStat({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return (
+    <View style={styles.overviewStat}>
+      <Text style={styles.overviewLabel}>{label}</Text>
+      <Text style={styles.overviewValue}>{value}</Text>
+      <Text numberOfLines={2} style={styles.overviewDetail}>{detail}</Text>
     </View>
   );
 }
@@ -344,11 +407,41 @@ function formatDuration(minutes: number) {
 }
 
 const styles = StyleSheet.create({
-  availabilityButton: { padding: 16, borderRadius: 14, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", alignItems: "center", padding: 16 },
   modalCard: { width: "100%", maxWidth: 640, maxHeight: "90%", backgroundColor: theme.colors.surface, borderRadius: 20, paddingHorizontal: 16 },
   modalHeader: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", paddingTop: 12 },
   modalClose: { padding: 14 },
+  workoutModalCard: {
+    width: "100%",
+    maxWidth: 900,
+    maxHeight: "92%",
+    overflow: "hidden",
+    backgroundColor: theme.colors.background,
+    borderRadius: 22,
+  },
+  workoutModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 18,
+    paddingHorizontal: 22,
+    paddingVertical: 17,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+  },
+  workoutModalHeading: { flex: 1 },
+  workoutModalTitle: { color: theme.colors.text, fontSize: 22, fontWeight: "700", marginTop: 4 },
+  workoutModalClose: {
+    minHeight: 42,
+    justifyContent: "center",
+    paddingHorizontal: 15,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  workoutModalCloseText: { color: theme.colors.text, fontSize: 13, fontWeight: "700" },
+  workoutModalContent: { padding: 18, paddingBottom: 26 },
   page: { flex: 1, backgroundColor: theme.colors.background },
   scrollContent: { paddingBottom: 140 },
   container: {
@@ -358,7 +451,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   header: {
-    height: 82,
+    height: 68,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -380,7 +473,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarText: { color: theme.colors.text, fontWeight: "700" },
-  hero: { paddingTop: 18, paddingBottom: 25 },
+  hero: { paddingTop: 8, paddingBottom: 18 },
   eyebrow: {
     color: theme.colors.accent,
     fontSize: 9,
@@ -396,48 +489,57 @@ const styles = StyleSheet.create({
   },
   titleCompact: { fontSize: 27 },
   subtitle: { color: theme.colors.textSecondary, fontSize: 13, marginTop: 7 },
-  focusCard: {
-    backgroundColor: theme.colors.text,
+  weekOverview: {
+    padding: 20,
     borderRadius: 20,
-    padding: 22,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+  },
+  weekOverviewTop: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "flex-end",
     justifyContent: "space-between",
-    gap: 24,
+    gap: 18,
   },
-  focusCardCompact: { flexDirection: "column" },
-  focusContent: { flex: 1 },
-  focusEyebrow: {
-    color: theme.colors.accent,
-    fontSize: 9,
-    fontWeight: "800",
-    letterSpacing: 1.3,
+  weekOverviewTitle: { color: theme.colors.text, fontSize: 25, fontWeight: "700", marginTop: 4 },
+  weekTabs: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    gap: 4,
+    marginTop: 17,
+    padding: 4,
+    borderRadius: 12,
+    backgroundColor: theme.colors.background,
   },
-  focusTitle: {
-    color: theme.colors.white,
-    fontSize: 22,
-    fontWeight: "700",
-    marginTop: 7,
+  weekTab: { minHeight: 38, justifyContent: "center", paddingHorizontal: 15, borderRadius: 9 },
+  weekTabActive: { backgroundColor: theme.colors.text },
+  weekTabText: { color: theme.colors.textSecondary, fontSize: 12, fontWeight: "600" },
+  weekTabTextActive: { color: theme.colors.white },
+  overviewStats: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 14 },
+  overviewStat: {
+    flexGrow: 1,
+    flexBasis: 220,
+    minHeight: 108,
+    padding: 15,
+    borderRadius: 14,
+    backgroundColor: theme.colors.background,
   },
-  focusDescription: {
-    color: "#B6BEBA",
-    fontSize: 13,
-    lineHeight: 20,
-    maxWidth: 650,
-    marginTop: 9,
+  overviewLabel: { color: theme.colors.accent, fontSize: 8, fontWeight: "800", letterSpacing: 1 },
+  overviewValue: { color: theme.colors.text, fontSize: 16, fontWeight: "700", marginTop: 7 },
+  overviewDetail: { color: theme.colors.textSecondary, fontSize: 11, lineHeight: 17, marginTop: 5 },
+  overviewMessages: { gap: 4, marginTop: 12 },
+  overviewMessage: { color: theme.colors.textSecondary, fontSize: 11, lineHeight: 17 },
+  overviewAction: {
+    alignSelf: "flex-start",
+    minHeight: 42,
+    justifyContent: "center",
+    marginTop: 12,
+    paddingHorizontal: 15,
+    borderRadius: 10,
+    backgroundColor: theme.colors.accentSoft,
   },
-  focusPill: {
-    borderRadius: 999,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    backgroundColor: "#24302D",
-  },
-  focusPillText: {
-    color: theme.colors.accent,
-    fontSize: 8,
-    fontWeight: "800",
-    letterSpacing: 0.8,
-  },
+  overviewActionText: { color: theme.colors.accent, fontSize: 12, fontWeight: "700" },
   sectionHeader: {
     marginTop: 42,
     marginBottom: 16,
@@ -446,6 +548,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     gap: 18,
   },
+  calendarHeader: { marginTop: 28 },
   sectionEyebrow: {
     color: theme.colors.accent,
     fontSize: 8,

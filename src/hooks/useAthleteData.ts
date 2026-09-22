@@ -76,8 +76,12 @@ export function useAthleteData(
   useEffect(() => {
     if (!userId) return;
 
+    // RealtimeClient reuses channels with an identical topic. React Strict Mode can
+    // mount a replacement effect before the prior async removal finishes, so each
+    // subscription needs its own topic to avoid adding handlers to a joined channel.
+    const channelTopic = `athlete-progress:${userId}:${createChannelNonce()}`;
     const channel = supabase
-      .channel(`athlete-progress:${userId}`)
+      .channel(channelTopic)
       .on("postgres_changes", { event: "*", schema: "public", table: "power_profiles", filter: `user_id=eq.${userId}` }, refreshAthlete)
       .on("postgres_changes", { event: "*", schema: "public", table: "vo2max_tests", filter: `user_id=eq.${userId}` }, refreshAthlete)
       .on("postgres_changes", { event: "*", schema: "public", table: "lactate_tests", filter: `user_id=eq.${userId}` }, refreshAthlete)
@@ -91,4 +95,12 @@ export function useAthleteData(
 
   // Never display a previous account's cached profile after sign-out/user switching.
   return { athlete: athlete?.profile.id === userId ? athlete : null, setAthlete, refreshAthlete, isLoading, error };
+}
+
+function createChannelNonce() {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }

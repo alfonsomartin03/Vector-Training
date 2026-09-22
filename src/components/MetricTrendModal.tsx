@@ -1,5 +1,5 @@
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
-import Svg, { Circle, G, Line, Path } from "react-native-svg";
+import Svg, { Circle, G, Line, Path, Text as SvgText } from "react-native-svg";
 
 import { theme } from "../constants/theme";
 import type { MetricHistoryPoint, MetricTrend as MetricTrendValue } from "../lib/physiology/progress";
@@ -24,7 +24,7 @@ type Props = {
 
 const CHART_WIDTH = 520;
 const CHART_HEIGHT = 190;
-const CHART_PADDING = 20;
+const CHART_PADDING = { top: 16, right: 16, bottom: 16, left: 48 };
 const SERIES_COLORS = [theme.colors.accent, "#D68C45"] as const;
 
 export function MetricTrendModal({ visible, title, description, unit, series, onClose }: Props) {
@@ -38,17 +38,14 @@ export function MetricTrendModal({ visible, title, description, unit, series, on
       transparent
       visible={visible}
     >
-      <Pressable
-        accessibilityLabel="Close trend details"
-        accessibilityRole="button"
-        onPress={onClose}
-        style={styles.backdrop}
-      >
+      <View style={styles.backdrop}>
         <Pressable
-          accessibilityRole="none"
-          onPress={(event) => event.stopPropagation()}
-          style={styles.dialog}
-        >
+          accessibilityLabel="Close trend details"
+          accessibilityRole="button"
+          onPress={onClose}
+          style={styles.backdropDismiss}
+        />
+        <View style={styles.dialog}>
           <View style={styles.header}>
             <View style={styles.headerCopy}>
               <Text style={styles.eyebrow}>PROGRESS</Text>
@@ -99,8 +96,8 @@ export function MetricTrendModal({ visible, title, description, unit, series, on
               <Text style={styles.emptyCopy}>Add a valid measurement to begin tracking this value.</Text>
             </View>
           )}
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -114,9 +111,10 @@ function TrendGraph({ series }: { series: TrendGraphSeries[] }) {
   const chartMinimum = minimum - padding;
   const chartMaximum = maximum + padding;
   const chartRange = chartMaximum - chartMinimum;
-  const plotWidth = CHART_WIDTH - CHART_PADDING * 2;
-  const plotHeight = CHART_HEIGHT - CHART_PADDING * 2;
-  const yFor = (value: number) => CHART_PADDING + ((chartMaximum - value) / chartRange) * plotHeight;
+  const plotWidth = CHART_WIDTH - CHART_PADDING.left - CHART_PADDING.right;
+  const plotHeight = CHART_HEIGHT - CHART_PADDING.top - CHART_PADDING.bottom;
+  const yFor = (value: number) => CHART_PADDING.top + ((chartMaximum - value) / chartRange) * plotHeight;
+  const referenceValues = [chartMaximum, (chartMaximum + chartMinimum) / 2, chartMinimum];
 
   return (
     <View style={styles.chartFrame}>
@@ -126,24 +124,35 @@ function TrendGraph({ series }: { series: TrendGraphSeries[] }) {
         viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
         width="100%"
       >
-        {[0.25, 0.5, 0.75].map((position) => (
-          <Line
-            key={position}
-            x1={CHART_PADDING}
-            x2={CHART_WIDTH - CHART_PADDING}
-            y1={CHART_PADDING + plotHeight * position}
-            y2={CHART_PADDING + plotHeight * position}
-            stroke={theme.colors.border}
-            strokeWidth={1}
-          />
+        {referenceValues.map((value) => (
+          <G key={value}>
+            <Line
+              x1={CHART_PADDING.left}
+              x2={CHART_WIDTH - CHART_PADDING.right}
+              y1={yFor(value)}
+              y2={yFor(value)}
+              stroke={theme.colors.border}
+              strokeDasharray="3 5"
+              strokeWidth={1}
+            />
+            <SvgText
+              fill={theme.colors.textSecondary}
+              fontSize={10}
+              textAnchor="end"
+              x={CHART_PADDING.left - 9}
+              y={yFor(value) + 3.5}
+            >
+              {formatReferenceValue(value, rawRange)}
+            </SvgText>
+          </G>
         ))}
 
         {series.map((item, seriesIndex) => {
           const chronological = [...item.points].reverse();
           const color = item.color ?? SERIES_COLORS[seriesIndex % SERIES_COLORS.length];
           const xFor = (index: number) => chronological.length === 1
-            ? CHART_WIDTH / 2
-            : CHART_PADDING + (index / (chronological.length - 1)) * plotWidth;
+            ? CHART_PADDING.left + plotWidth / 2
+            : CHART_PADDING.left + (index / (chronological.length - 1)) * plotWidth;
           const path = chronological.map((point, index) => (
             `${index === 0 ? "M" : "L"} ${xFor(index).toFixed(2)} ${yFor(point.value).toFixed(2)}`
           )).join(" ");
@@ -186,6 +195,11 @@ function countUniquePoints(series: TrendGraphSeries[]) {
   return new Set(series.flatMap((item) => item.points.map((point, index) => point.date ?? `${item.label}-${index}`))).size;
 }
 
+function formatReferenceValue(value: number, range: number) {
+  const decimals = range < 10 ? 1 : 0;
+  return value.toFixed(decimals);
+}
+
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
@@ -194,6 +208,7 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: "rgba(17, 19, 21, 0.48)",
   },
+  backdropDismiss: { position: "absolute", inset: 0 },
   dialog: {
     width: "100%",
     maxWidth: 620,

@@ -13,7 +13,7 @@ execFileSync(process.execPath, [
   "--skipLibCheck", "--rootDir", "src", "--outDir", output,
 ], { cwd: path.resolve(__dirname, ".."), stdio: "inherit" });
 
-const { buildAthleteProgress } = require(path.join(output, "lib/physiology/progress.js"));
+const { buildAthleteProgress, buildAthleteProgressHistory } = require(path.join(output, "lib/physiology/progress.js"));
 
 function powerPoint(cp, fiveMinute, date) {
   const wPrime = (fiveMinute - cp) * 420;
@@ -89,4 +89,17 @@ test("one data point reports a baseline rather than inventing a zero trend", () 
   const progress = buildAthleteProgress(athlete({ powerProfile: current, powerHistory: [current] }));
   assert.equal(progress.criticalPower, null);
   assert.equal(progress.oneMinutePower, null);
+});
+
+test("graph history exposes every valid point newest first", () => {
+  const data = athlete();
+  const history = buildAthleteProgressHistory(data);
+
+  assert.equal(history.criticalPower.length, 2);
+  assert.ok(Math.abs(history.criticalPower[0].value - 300) < 1e-6);
+  assert.ok(Math.abs(history.criticalPower[1].value - 280) < 1e-6);
+  assert.deepEqual(
+    history.fiveMinutePower.map((point) => point.date),
+    ["2026-09-21T12:00:00Z", "2026-08-21T12:00:00Z"],
+  );
 });

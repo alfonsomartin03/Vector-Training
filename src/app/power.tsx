@@ -16,6 +16,7 @@ import {
 } from "../components/power/PowerDataModals";
 import { PowerDurationChart } from "../components/power/PowerDurationChart";
 import { MetricTrend } from "../components/MetricTrend";
+import { MetricTrendModal, type TrendGraphSeries } from "../components/MetricTrendModal";
 import { theme } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
 import { useAthleteData } from "../hooks/useAthleteData";
@@ -30,7 +31,11 @@ import {
   updatePowerProfile,
 } from "../lib/athlete";
 import { buildAthleteModel } from "../lib/physiology/athleteModel";
-import { buildAthleteProgress, type MetricTrend as MetricTrendValue } from "../lib/physiology/progress";
+import {
+  buildAthleteProgress,
+  buildAthleteProgressHistory,
+  type MetricTrend as MetricTrendValue,
+} from "../lib/physiology/progress";
 import {
   buildCriticalPowerZones,
   type CriticalPowerZone,
@@ -46,6 +51,7 @@ export default function PowerPage() {
     "Failed to load power data:"
   );
   const [editor, setEditor] = useState<"power" | "vo2" | "lactate" | null>(null);
+  const [selectedMetric, setSelectedMetric] = useState<PowerMetric | null>(null);
   const compact = width < 760;
 
   const model = useMemo(
@@ -60,6 +66,26 @@ export default function PowerPage() {
     () => (athlete ? buildAthleteProgress(athlete) : null),
     [athlete]
   );
+  const progressHistory = useMemo(
+    () => (athlete ? buildAthleteProgressHistory(athlete) : null),
+    [athlete]
+  );
+  const selectedTrendSeries = useMemo<TrendGraphSeries[]>(() => {
+    if (!selectedMetric) return [];
+    if (selectedMetric === "lactateThresholds") {
+      return [
+        { label: "LT1", points: progressHistory?.lt1Power ?? [], trend: progress?.lt1Power ?? null, decimals: 0 },
+        { label: "LT2", points: progressHistory?.lt2Power ?? [], trend: progress?.lt2Power ?? null, decimals: 0 },
+      ];
+    }
+
+    return [{
+      label: POWER_METRICS[selectedMetric].seriesLabel,
+      points: progressHistory?.[selectedMetric] ?? [],
+      trend: progress?.[selectedMetric] ?? null,
+      decimals: POWER_METRICS[selectedMetric].decimals,
+    }];
+  }, [progress, progressHistory, selectedMetric]);
   const profile = athlete?.profile;
   const powerProfile = athlete?.powerProfile ?? null;
   const vo2MaxTest = athlete?.vo2MaxTest ?? null;
@@ -135,6 +161,7 @@ export default function PowerPage() {
               }
               source="Modeled"
               trend={progress?.criticalPower ?? null}
+              onPress={() => setSelectedMetric("criticalPower")}
             />
             <MetricCard
               label="W′"
@@ -142,6 +169,7 @@ export default function PowerPage() {
               detail="Severe-domain capacity"
               source="Modeled"
               trend={progress?.wPrime ?? null}
+              onPress={() => setSelectedMetric("wPrime")}
             />
             <MetricCard
               label="VO₂max"
@@ -150,6 +178,7 @@ export default function PowerPage() {
               source={model?.vo2MaxSource === "measured" ? "Measured" : "Estimated"}
               emphasized={model?.vo2MaxSource === "measured"}
               trend={progress?.vo2Max ?? null}
+              onPress={() => setSelectedMetric("vo2Max")}
             />
             <MetricCard
               label="Lactate thresholds"
@@ -158,6 +187,7 @@ export default function PowerPage() {
               source={lactateTest ? "Measured" : "Missing"}
               emphasized={Boolean(lactateTest)}
               trend={progress?.lt2Power ?? progress?.lt1Power ?? null}
+              onPress={() => setSelectedMetric("lactateThresholds")}
             />
           </View>
 
@@ -368,9 +398,58 @@ export default function PowerPage() {
           onSave={handleLactateSave}
         />
       ) : null}
+      {selectedMetric ? (
+        <MetricTrendModal
+          visible
+          title={POWER_METRICS[selectedMetric].title}
+          description={POWER_METRICS[selectedMetric].description}
+          unit={POWER_METRICS[selectedMetric].unit}
+          series={selectedTrendSeries}
+          onClose={() => setSelectedMetric(null)}
+        />
+      ) : null}
     </View>
   );
 }
+
+type PowerMetric = "criticalPower" | "wPrime" | "vo2Max" | "lactateThresholds";
+
+const POWER_METRICS: Record<PowerMetric, {
+  title: string;
+  description: string;
+  unit: string;
+  seriesLabel: string;
+  decimals: number;
+}> = {
+  criticalPower: {
+    title: "Critical Power",
+    description: "Your modeled sustainable power across recorded maximal-effort tests.",
+    unit: "W",
+    seriesLabel: "CP",
+    decimals: 0,
+  },
+  wPrime: {
+    title: "W′",
+    description: "Your modeled work capacity above critical power over time.",
+    unit: "kJ",
+    seriesLabel: "W′",
+    decimals: 1,
+  },
+  vo2Max: {
+    title: "VO₂max",
+    description: "Measured VO₂max history when available, otherwise your power-based estimate.",
+    unit: "mL/kg/min",
+    seriesLabel: "VO₂max",
+    decimals: 1,
+  },
+  lactateThresholds: {
+    title: "Lactate thresholds",
+    description: "Your measured LT1 and LT2 power across laboratory tests.",
+    unit: "W",
+    seriesLabel: "Threshold",
+    decimals: 0,
+  },
+};
 
 function MetricCard({
   label,
@@ -379,6 +458,7 @@ function MetricCard({
   source,
   emphasized,
   trend,
+  onPress,
 }: {
   label: string;
   value: string;
@@ -386,9 +466,15 @@ function MetricCard({
   source: string;
   emphasized?: boolean;
   trend: MetricTrendValue | null;
+  onPress: () => void;
 }) {
   return (
-    <View style={styles.metric}>
+    <Pressable
+      accessibilityLabel={`View ${label} trend`}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.metric, pressed ? styles.pressed : undefined]}
+    >
       <View style={styles.metricTop}>
         <Text style={styles.metricLabel}>{label}</Text>
         <View style={[styles.sourceDot, emphasized ? styles.sourceDotActive : undefined]} />
@@ -399,7 +485,7 @@ function MetricCard({
       <Text style={[styles.metricSource, emphasized ? styles.metricSourceActive : undefined]}>
         {source}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 

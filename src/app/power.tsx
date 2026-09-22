@@ -8,6 +8,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { AppBottomNav } from "../components/AppBottomNav";
 
 import {
   LactateModal,
@@ -371,7 +372,7 @@ export default function PowerPage() {
         </View>
       </ScrollView>
 
-      <BottomNav />
+      <AppBottomNav active="power" />
 
       {editor === "power" ? (
         <PowerProfileModal
@@ -620,35 +621,6 @@ function Meta({ label, value }: { label: string; value: string }) {
     <View>
       <Text style={styles.metaLabel}>{label}</Text>
       <Text style={styles.metaValue}>{value}</Text>
-    </View>
-  );
-}
-
-function BottomNav() {
-  const items = [
-    ["⌂", "Home", "/dashboard"],
-    ["⌁", "Training", "/training"],
-    ["↗", "Power", "/power"],
-    ["○", "Profile", "/profile"],
-  ] as const;
-
-  return (
-    <View style={styles.navWrapper}>
-      <View style={styles.nav}>
-        {items.map(([symbol, label, route]) => {
-          const active = route === "/power";
-          return (
-            <Pressable
-              key={route}
-              onPress={() => router.push(route)}
-              style={[styles.navItem, active ? styles.navItemActive : undefined]}
-            >
-              <Text style={[styles.navSymbol, active ? styles.navSymbolActive : undefined]}>{symbol}</Text>
-              <Text style={[styles.navLabel, active ? styles.navLabelActive : undefined]}>{label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
     </View>
   );
 }
@@ -947,22 +919,4 @@ const styles = StyleSheet.create({
   explainerMarker: { width: 4, borderRadius: 2, backgroundColor: theme.colors.accent },
   explainerCopy: { flex: 1 },
   explainerTitle: { color: theme.colors.text, fontSize: 20, fontWeight: "700", marginTop: 7 },
-  navWrapper: { position: "absolute", bottom: 18, left: 0, right: 0, alignItems: "center", paddingHorizontal: 18 },
-  nav: {
-    width: "100%",
-    maxWidth: 540,
-    flexDirection: "row",
-    padding: 7,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    boxShadow: "0 8px 18px rgba(0, 0, 0, 0.08)",
-  },
-  navItem: { flex: 1, minHeight: 52, alignItems: "center", justifyContent: "center", borderRadius: 13, gap: 3 },
-  navItemActive: { backgroundColor: theme.colors.accentSoft },
-  navSymbol: { color: theme.colors.textSecondary, fontSize: 16 },
-  navSymbolActive: { color: theme.colors.accent },
-  navLabel: { color: theme.colors.textSecondary, fontSize: 9, fontWeight: "600" },
-  navLabelActive: { color: theme.colors.accent },
 });

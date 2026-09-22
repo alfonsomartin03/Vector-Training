@@ -20,6 +20,10 @@ npm run web
 
 Set the two Supabase values in `.env` before starting. Use `npm run typecheck` and `npm run lint` before committing changes.
 
+Security controls, current dependency-audit exceptions, and production checks are
+documented in [docs/security-audit.md](docs/security-audit.md). Run
+`npm run test:security` when changing Auth, database policies, or account APIs.
+
 Database changes are versioned in `supabase/migrations`. Apply pending migrations to the linked Supabase project before deploying application code that depends on them, either with the Supabase CLI or through the project SQL editor.
 
 Weekly availability and suggested workouts require the training-availability migration.

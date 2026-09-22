@@ -12,6 +12,7 @@ import {
 } from "react-native";
 
 import { theme } from "../constants/theme";
+import { isValidEmail } from "../lib/accountValidation";
 import { supabase } from "../lib/supabase";
 
 export default function LoginPage() {
@@ -30,7 +31,7 @@ export default function LoginPage() {
     setError(null);
     setNotice(null);
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    if (!isValidEmail(cleanEmail)) {
       setError("Enter your email address first, then request a password reset.");
       return;
     }
@@ -63,7 +64,7 @@ export default function LoginPage() {
       return;
     }
 
-    if (!cleanEmail.includes("@")) {
+    if (!isValidEmail(cleanEmail)) {
       setError("Enter a valid email address.");
       return;
     }
@@ -78,12 +79,11 @@ export default function LoginPage() {
         });
 
       if (signInError) {
-        console.error("Login error:", signInError);
-
+        console.error("Login request failed.");
         setError(
           signInError.message === "Invalid login credentials"
             ? "Incorrect email or password."
-            : signInError.message
+            : "Unable to sign in right now. Please try again."
         );
 
         return;
@@ -96,8 +96,8 @@ export default function LoginPage() {
 
       // Successful login
       router.replace("/dashboard");
-    } catch (err) {
-      console.error("Unexpected login error:", err);
+    } catch {
+      console.error("Unexpected login failure.");
 
       setError(
         "Something went wrong while signing in. Please try again."

@@ -14,15 +14,13 @@ const PROTECTED_ROUTES = new Set(["admin", "dashboard", "power", "profile", "tra
 export function AuthGate({ children }: AuthGateProps) {
   const { session, loading } = useAuth();
   const segments = useSegments();
+  const currentRoute = segments[0] ?? "";
+  const isProtectedRoute = PROTECTED_ROUTES.has(currentRoute);
 
   useEffect(() => {
     // Do not make routing decisions until Supabase has checked
     // whether a persisted session exists.
     if (loading) return;
-
-    const currentRoute = segments[0] ?? "";
-
-    const isProtectedRoute = PROTECTED_ROUTES.has(currentRoute);
 
     /*
      * User is NOT authenticated and attempts to access
@@ -42,13 +40,16 @@ export function AuthGate({ children }: AuthGateProps) {
     if (session && currentRoute === "login") {
       router.replace("/dashboard");
     }
-  }, [session, loading, segments]);
+  }, [session, loading, currentRoute, isProtectedRoute]);
 
   /*
    * While Supabase restores the session, don't briefly render
    * a protected screen or redirect incorrectly.
    */
-  if (loading) {
+  // Never mount a protected route without a verified session. Apart from
+  // preventing a private-screen flash, this keeps its data hooks from issuing
+  // requests while the redirect is still pending.
+  if (loading || (!session && isProtectedRoute) || (session && currentRoute === "login")) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="small" />

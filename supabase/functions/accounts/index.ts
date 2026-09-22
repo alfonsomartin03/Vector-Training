@@ -96,4 +96,9 @@ const store: AccountStore = {
   },
 };
 
-Deno.serve(createAccountHandler(store));
+const configuredOrigins = Deno.env.get("ACCOUNT_ALLOWED_ORIGINS")
+  ?.split(",")
+  .map(origin => origin.trim())
+  .filter(Boolean);
+
+Deno.serve(createAccountHandler(store, configuredOrigins?.length ? { allowedOrigins: configuredOrigins } : undefined));

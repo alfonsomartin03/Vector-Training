@@ -76,19 +76,28 @@ export function useAthleteData(
   useEffect(() => {
     if (!userId) return;
 
+    let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      // A power insert also invalidates the profile focus, producing multiple
+      // realtime events. Coalesce that burst into one database refresh.
+      refreshTimer = setTimeout(() => void refreshAthlete(), 100);
+    };
+
     // RealtimeClient reuses channels with an identical topic. React Strict Mode can
     // mount a replacement effect before the prior async removal finishes, so each
     // subscription needs its own topic to avoid adding handlers to a joined channel.
     const channelTopic = `athlete-progress:${userId}:${createChannelNonce()}`;
     const channel = supabase
       .channel(channelTopic)
-      .on("postgres_changes", { event: "*", schema: "public", table: "power_profiles", filter: `user_id=eq.${userId}` }, refreshAthlete)
-      .on("postgres_changes", { event: "*", schema: "public", table: "vo2max_tests", filter: `user_id=eq.${userId}` }, refreshAthlete)
-      .on("postgres_changes", { event: "*", schema: "public", table: "lactate_tests", filter: `user_id=eq.${userId}` }, refreshAthlete)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${userId}` }, refreshAthlete)
+      .on("postgres_changes", { event: "*", schema: "public", table: "power_profiles", filter: `user_id=eq.${userId}` }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "vo2max_tests", filter: `user_id=eq.${userId}` }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "lactate_tests", filter: `user_id=eq.${userId}` }, scheduleRefresh)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${userId}` }, scheduleRefresh)
       .subscribe();
 
     return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
       void supabase.removeChannel(channel);
     };
   }, [refreshAthlete, userId]);

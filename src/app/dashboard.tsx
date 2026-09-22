@@ -10,6 +10,7 @@ import {
 } from "react-native";
 
 import { theme } from "../constants/theme";
+import { AppBottomNav } from "../components/AppBottomNav";
 import { MetricTrend } from "../components/MetricTrend";
 import { MetricTrendModal } from "../components/MetricTrendModal";
 import { useAuth } from "../context/AuthContext";
@@ -193,7 +194,7 @@ export default function DashboardPage() {
         </View>
       </ScrollView>
 
-      <BottomNav />
+      <AppBottomNav active="home" />
       {selectedMetric ? (
         <MetricTrendModal
           visible
@@ -344,39 +345,6 @@ function Meta({ label, value }: { label: string; value: string }) {
     <View>
       <Text style={styles.metaLabel}>{label}</Text>
       <Text style={styles.metaValue}>{value}</Text>
-    </View>
-  );
-}
-
-function BottomNav() {
-  const items = [
-    ["⌂", "Home", "/dashboard"],
-    ["⌁", "Training", "/training"],
-    ["↗", "Power", "/power"],
-    ["○", "Profile", "/profile"],
-  ] as const;
-
-  return (
-    <View style={styles.navWrapper}>
-      <View style={styles.nav}>
-        {items.map(([symbol, label, route]) => {
-          const active = route === "/dashboard";
-          return (
-            <Pressable
-              key={route}
-              onPress={() => router.push(route)}
-              style={[styles.navItem, active ? styles.navItemActive : undefined]}
-            >
-              <Text style={[styles.navSymbol, active ? styles.navSymbolActive : undefined]}>
-                {symbol}
-              </Text>
-              <Text style={[styles.navLabel, active ? styles.navLabelActive : undefined]}>
-                {label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
     </View>
   );
 }
@@ -590,38 +558,4 @@ const styles = StyleSheet.create({
   quickDetail: { color: theme.colors.textSecondary, fontSize: 9, lineHeight: 14, marginTop: 4 },
   quickArrow: { color: theme.colors.accent, fontSize: 16 },
   pressed: { opacity: 0.68 },
-  navWrapper: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 18,
-    alignItems: "center",
-    paddingHorizontal: 18,
-  },
-  nav: {
-    width: "100%",
-    maxWidth: 520,
-    minHeight: 68,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-around",
-    padding: 7,
-    borderRadius: 24,
-    backgroundColor: "#FFFFFFF2",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.08)",
-  },
-  navItem: {
-    minWidth: 80,
-    minHeight: 52,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 18,
-  },
-  navItemActive: { backgroundColor: theme.colors.accentSoft },
-  navSymbol: { color: theme.colors.textSecondary, fontSize: 18 },
-  navSymbolActive: { color: theme.colors.accent },
-  navLabel: { color: theme.colors.textSecondary, fontSize: 10, marginTop: 3 },
-  navLabelActive: { color: theme.colors.text, fontWeight: "600" },
 });

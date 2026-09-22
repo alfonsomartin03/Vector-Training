@@ -6,10 +6,10 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "9.1.0",
     "@supabase/supabase-js": "^2.116.0",
-    "expo": "~57.0.22",
-    "expo-constants": "~57.0.17",
+    "expo": "~57.0.24",
+    "expo-constants": "~57.0.19",
     "expo-linking": "~57.0.10",
-    "expo-router": "~57.0.21",
+    "expo-router": "~57.0.22",
     "expo-splash-screen": "~57.0.9",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -30,6 +30,7 @@
   "scripts": {
     "site:prepare": "node scripts/prepare-site-files.mjs",
     "build:web": "npm run site:prepare && expo export --platform web",
+    "audit:dependencies": "npm audit --omit=dev --audit-level=high",
     "check:compliance": "node scripts/check-compliance.mjs",
     "test:prescription": "node --test tests/prescription.test.cjs tests/availabilityDatabase.test.cjs tests/trainingProgressionDatabase.test.cjs tests/workoutPreview.test.cjs",
     "start": "expo start",
@@ -41,7 +42,8 @@
     "test:workouts": "node --test tests/workouts.test.cjs",
     "test:admin": "node --test tests/admin.test.cjs tests/adminDatabase.test.cjs",
     "test:focus": "node --test tests/trainingFocus.test.cjs tests/trainingFocusDatabase.test.cjs",
-    "test:progress": "node --test tests/progress.test.cjs"
+    "test:progress": "node --test tests/progress.test.cjs",
+    "test:security": "node --test tests/admin.test.cjs tests/adminDatabase.test.cjs tests/securityDatabase.test.cjs"
   },
   "private": true
 }

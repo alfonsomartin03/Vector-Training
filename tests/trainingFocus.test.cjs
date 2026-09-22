@@ -110,6 +110,12 @@ function loader({ profile = {}, savedFocus = null, conflict = false, writeError 
         select() { return query; }, order() { return query; }, limit() { return query; },
         eq(key, value) { filters[key] = value; return query; },
         update(value) { payload = value; return query; },
+        then(resolve, reject) {
+          const result = table === "power_profiles"
+            ? { data: [data.powerProfile], error: null }
+            : { data: [], error: null };
+          return Promise.resolve(result).then(resolve, reject);
+        },
         async single() { return query.maybeSingle(); },
         async maybeSingle() {
           if (table === "profiles" && payload) {

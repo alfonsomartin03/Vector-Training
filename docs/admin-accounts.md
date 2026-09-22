@@ -41,6 +41,11 @@ This branch includes the training-focus classifier from main alongside account m
    the legacy gateway JWT check; every POST is explicitly authenticated through
    Auth `getUser(token)` before any privileged operation, including with asymmetric
    signing keys. Do not deploy a modified handler that omits this check.
+   Browser requests are restricted to exact approved origins. If the site is
+   deployed at another domain or a Vercel preview URL, set the function secret
+   `ACCOUNT_ALLOWED_ORIGINS` to a comma-separated list of the exact trusted
+   origins and redeploy. Requests from native clients have no browser Origin and
+   still require the same verified bearer token.
 3. Bootstrap the first admin using the Supabase SQL editor. First look up and
    verify the exact existing Auth user ID in Authentication → Users, then run:
 

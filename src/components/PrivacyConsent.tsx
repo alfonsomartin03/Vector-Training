@@ -19,7 +19,7 @@ function startAnalytics() {
   if (Platform.OS !== "web" || typeof document === "undefined") return;
 
   const domain = process.env.EXPO_PUBLIC_ANALYTICS_DOMAIN?.trim();
-  const scriptUrl = process.env.EXPO_PUBLIC_ANALYTICS_SCRIPT_URL?.trim() || "https://plausible.io/js/script.js";
+  const scriptUrl = safeAnalyticsScriptUrl(process.env.EXPO_PUBLIC_ANALYTICS_SCRIPT_URL);
   if (!domain || document.querySelector("script[data-vector-analytics]")) return;
 
   const script = document.createElement("script");
@@ -28,6 +28,18 @@ function startAnalytics() {
   script.dataset.domain = domain;
   script.dataset.vectorAnalytics = "true";
   document.head.appendChild(script);
+}
+
+function safeAnalyticsScriptUrl(configured: string | undefined) {
+  const fallback = "https://plausible.io/js/script.js";
+  try {
+    const url = new URL(configured?.trim() || fallback);
+    return url.protocol === "https:" && url.origin === "https://plausible.io"
+      ? url.toString()
+      : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 export function PrivacyConsent() {

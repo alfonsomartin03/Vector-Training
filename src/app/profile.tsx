@@ -12,6 +12,7 @@ import { router } from "expo-router";
 import { useMemo, useState } from "react";
 
 import { theme } from "../constants/theme";
+import { AppBottomNav } from "../components/AppBottomNav";
 import { AccountDeletePanel } from "../components/AccountDeletePanel";
 import { useAdminAccess } from "../hooks/useAdminAccess";
 import { supabase } from "../lib/supabase";
@@ -434,7 +435,7 @@ export default function ProfilePage() {
         </View>
       </ScrollView>
 
-      <BottomNav />
+      <AppBottomNav active="profile" />
 
       {/* Power editor modal */}
       <Modal
@@ -667,95 +668,6 @@ function Connection({
 
       <View style={styles.connectionDot} />
     </View>
-  );
-}
-
-function BottomNav() {
-  return (
-    <View style={styles.navWrapper}>
-      <View style={styles.nav}>
-        <Nav
-          symbol="⌂"
-          label="Home"
-          onPress={() =>
-            router.push("/dashboard")
-          }
-        />
-
-        <Nav
-          symbol="⌁"
-          label="Training"
-          onPress={() =>
-            router.push("/training")
-          }
-        />
-
-        <Nav
-          symbol="↗"
-          label="Power"
-          onPress={() =>
-            router.push("/power")
-          }
-        />
-
-        <Nav
-          symbol="○"
-          label="Profile"
-          active
-          onPress={() =>
-            router.push("/profile")
-          }
-        />
-      </View>
-    </View>
-  );
-}
-
-type NavProps = {
-  symbol: string;
-  label: string;
-  active?: boolean;
-  onPress: () => void;
-};
-
-function Nav({
-  symbol,
-  label,
-  active,
-  onPress,
-}: NavProps) {
-  return (
-    <Pressable
-      style={[
-        styles.navItem,
-        active
-          ? styles.navItemActive
-          : undefined,
-      ]}
-      onPress={onPress}
-    >
-      <Text
-        style={[
-          styles.navSymbol,
-          active
-            ? styles.navSymbolActive
-            : undefined,
-        ]}
-      >
-        {symbol}
-      </Text>
-
-      <Text
-        style={[
-          styles.navLabel,
-          active
-            ? styles.navLabelActive
-            : undefined,
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -1069,62 +981,6 @@ const styles = StyleSheet.create({
   profileErrorText: {
     color: "#A64E4E",
     fontSize: 12,
-  },
-
-  navWrapper: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 22,
-    alignItems: "center",
-    paddingHorizontal: 18,
-  },
-
-  nav: {
-    width: "100%",
-    maxWidth: 520,
-    minHeight: 68,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-around",
-    padding: 7,
-    borderRadius: 24,
-    backgroundColor: "#FFFFFFF2",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.08)",
-  },
-
-  navItem: {
-    minWidth: 80,
-    minHeight: 52,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 18,
-  },
-
-  navItemActive: {
-    backgroundColor: theme.colors.accentSoft,
-  },
-
-  navSymbol: {
-    color: theme.colors.textSecondary,
-    fontSize: 18,
-  },
-
-  navSymbolActive: {
-    color: theme.colors.accent,
-  },
-
-  navLabel: {
-    color: theme.colors.textSecondary,
-    fontSize: 10,
-    marginTop: 3,
-  },
-
-  navLabelActive: {
-    color: theme.colors.text,
-    fontWeight: "600",
   },
 
   // Power editor modal

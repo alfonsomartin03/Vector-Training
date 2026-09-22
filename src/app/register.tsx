@@ -19,6 +19,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { theme } from "../constants/theme";
 import { TrainingAvailabilityEditor } from "../components/TrainingAvailabilityEditor";
+import { isValidEmail, MIN_PASSWORD_LENGTH, passwordRequirements } from "../lib/accountValidation";
 import { validateAvailability, weekKey, type Availability } from "../lib/training/prescription";
 
 /* -------------------------------------------------------------------------- */
@@ -141,21 +142,13 @@ export default function RegisterScreen() {
   /* ------------------------------------------------------------------------ */
 
   const emailValid = useMemo(() => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-      data.account.email.trim()
-    );
+    return isValidEmail(data.account.email);
   }, [data.account.email]);
 
   const passwordChecks = useMemo(() => {
     const password = data.account.password;
 
-    return {
-      length: password.length >= 8,
-      uppercase: /[A-Z]/.test(password),
-      lowercase: /[a-z]/.test(password),
-      number: /\d/.test(password),
-      special: /[^A-Za-z0-9]/.test(password),
-    };
+    return passwordRequirements(password);
   }, [data.account.password]);
 
   const passwordStrong =
@@ -177,14 +170,19 @@ export default function RegisterScreen() {
     data.physiological.gender !== "" &&
     data.physiological.birthDate !== "" &&
     Number(data.physiological.weightKg) > 0 &&
+    Number(data.physiological.weightKg) <= 1000 &&
     data.physiological.trainingHistory !== "" &&
     data.physiological.weeklyVolume !== "" &&
     data.availability !== null && !validateAvailability(data.availability);
 
+  const oneMinuteWatts = Number(data.powerProfile.oneMinuteWatts);
+  const fiveMinuteWatts = Number(data.powerProfile.fiveMinuteWatts);
+  const twelveMinuteWatts = Number(data.powerProfile.twelveMinuteWatts);
   const powerValid =
-    Number(data.powerProfile.oneMinuteWatts) > 0 &&
-    Number(data.powerProfile.fiveMinuteWatts) > 0 &&
-    Number(data.powerProfile.twelveMinuteWatts) > 0 &&
+    oneMinuteWatts > fiveMinuteWatts &&
+    fiveMinuteWatts > twelveMinuteWatts &&
+    twelveMinuteWatts > 0 &&
+    oneMinuteWatts <= 5000 &&
     data.powerProfile.maximalEffortsConfirmed;
 
   /* ------------------------------------------------------------------------ */
@@ -269,10 +267,7 @@ export default function RegisterScreen() {
       });
 
       if (authError) {
-        console.error(
-          "Supabase sign-up error:",
-          authError
-        );
+        console.error("Account sign-up request failed.");
 
         const message =
           authError.message.toLowerCase();
@@ -282,11 +277,9 @@ export default function RegisterScreen() {
           message.includes("registered") ||
           message.includes("exists")
         ) {
-          setAccountError(
-            "An account already exists with this email. Try logging in instead."
-          );
+          setAccountError("We couldn't create this account. Check your details or try signing in.");
         } else {
-          setAccountError(authError.message);
+          setAccountError("We couldn't create this account. Please try again.");
         }
 
         return;
@@ -959,7 +952,7 @@ function AccountStep({
               met={
                 passwordChecks.length
               }
-              text="At least 8 characters"
+              text={`At least ${MIN_PASSWORD_LENGTH} characters`}
             />
 
             <Requirement

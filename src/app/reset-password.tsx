@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { theme } from "../constants/theme";
+import { isStrongPassword, MIN_PASSWORD_LENGTH } from "../lib/accountValidation";
 import { supabase } from "../lib/supabase";
 
 export default function ResetPasswordPage() {
@@ -11,7 +12,7 @@ export default function ResetPasswordPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const valid = useMemo(
-    () => password.length >= 12 && /[A-Z]/.test(password) && /[a-z]/.test(password) && /\d/.test(password) && /[^A-Za-z0-9]/.test(password) && password === confirmation,
+    () => isStrongPassword(password) && password === confirmation,
     [confirmation, password],
   );
 
@@ -33,7 +34,7 @@ export default function ResetPasswordPage() {
       <View style={styles.card}>
         <Text style={styles.eyebrow}>ACCOUNT SECURITY</Text>
         <Text accessibilityRole="header" style={styles.title}>Choose a new password.</Text>
-        <Text style={styles.body}>Use at least 12 characters with uppercase, lowercase, a number, and a symbol.</Text>
+        <Text style={styles.body}>Use at least {MIN_PASSWORD_LENGTH} characters with uppercase, lowercase, a number, and a symbol.</Text>
         <Text style={styles.label}>New password</Text>
         <TextInput accessibilityLabel="New password" secureTextEntry autoCapitalize="none" autoComplete="new-password" value={password} onChangeText={setPassword} maxLength={128} style={styles.input} />
         <Text style={styles.label}>Confirm new password</Text>

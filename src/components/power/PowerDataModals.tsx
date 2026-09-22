@@ -39,8 +39,8 @@ export function PowerProfileModal({ visible, current, onClose, onSave }: PowerMo
 
   async function submit() {
     const values = [oneMinute, fiveMinute, twelveMinute].map(Number);
-    if (values.some((value) => !Number.isFinite(value) || value <= 0)) {
-      setError("Enter a valid positive watt value for every effort.");
+    if (values.some((value) => !Number.isFinite(value) || value <= 0 || value > 5000)) {
+      setError("Enter a watt value from 1 to 5,000 for every effort.");
       return;
     }
     if (!(values[0] > values[1] && values[1] > values[2])) {
@@ -114,9 +114,17 @@ export function Vo2MaxModal({
   const [saving, setSaving] = useState(false);
 
   async function submit() {
-    const relativeValue = optionalNumber(relative);
-    const absoluteValue = optionalNumber(absolute);
-    const bodyMassValue = optionalNumber(bodyMass);
+    const relativeValue = optionalNumber(relative, 200);
+    const absoluteValue = optionalNumber(absolute, 20);
+    const bodyMassValue = optionalNumber(bodyMass, 1000);
+
+    if ([
+      [relative, 200], [absolute, 20], [bodyMass, 1000],
+      [vt1Power, 5000], [vt2Power, 5000], [maxAerobicPower, 5000],
+    ].some(([value, max]) => invalidOptional(String(value), Number(max)))) {
+      setError("One or more measurements are outside the supported range.");
+      return;
+    }
 
     if (relativeValue === null && absoluteValue === null) {
       setError("Enter an absolute or relative VO₂max value.");
@@ -137,9 +145,9 @@ export function Vo2MaxModal({
           relative_vo2max: relativeValue,
           absolute_vo2_l_min: absoluteValue,
           body_mass_kg: bodyMassValue,
-          vt1_power_watts: optionalNumber(vt1Power),
-          vt2_power_watts: optionalNumber(vt2Power),
-          max_aerobic_power_watts: optionalNumber(maxAerobicPower),
+          vt1_power_watts: optionalNumber(vt1Power, 5000),
+          vt2_power_watts: optionalNumber(vt2Power, 5000),
+          max_aerobic_power_watts: optionalNumber(maxAerobicPower, 5000),
           test_date: testDate,
           source: source.trim(),
         }),
@@ -207,8 +215,16 @@ export function LactateModal({ visible, current, onClose, onSave }: LactateModal
   const [saving, setSaving] = useState(false);
 
   async function submit() {
-    const lt1PowerValue = optionalNumber(lt1Power);
-    const lt2PowerValue = optionalNumber(lt2Power);
+    const lt1PowerValue = optionalNumber(lt1Power, 5000);
+    const lt2PowerValue = optionalNumber(lt2Power, 5000);
+    if ([
+      [lt1Power, 5000], [lt2Power, 5000],
+      [lt1HeartRate, 260], [lt2HeartRate, 260],
+      [lt1Lactate, 100], [lt2Lactate, 100],
+    ].some(([value, max]) => invalidOptional(String(value), Number(max)))) {
+      setError("One or more measurements are outside the supported range.");
+      return;
+    }
     if (lt1PowerValue === null && lt2PowerValue === null) {
       setError("Enter power for LT1, LT2, or both thresholds.");
       return;
@@ -222,11 +238,11 @@ export function LactateModal({ visible, current, onClose, onSave }: LactateModal
       () =>
         onSave({
           lt1_power_watts: lt1PowerValue,
-          lt1_heart_rate_bpm: optionalNumber(lt1HeartRate),
-          lt1_lactate_mmol: optionalNumber(lt1Lactate),
+          lt1_heart_rate_bpm: optionalNumber(lt1HeartRate, 260),
+          lt1_lactate_mmol: optionalNumber(lt1Lactate, 100),
           lt2_power_watts: lt2PowerValue,
-          lt2_heart_rate_bpm: optionalNumber(lt2HeartRate),
-          lt2_lactate_mmol: optionalNumber(lt2Lactate),
+          lt2_heart_rate_bpm: optionalNumber(lt2HeartRate, 260),
+          lt2_lactate_mmol: optionalNumber(lt2Lactate, 100),
           test_date: testDate,
           source: source.trim(),
         }),
@@ -343,6 +359,7 @@ function Field({ label, value, onChange, unit, keyboard = "decimal-pad" }: Field
         <TextInput
           value={value}
           onChangeText={onChange}
+          maxLength={keyboard === "default" ? 200 : 12}
           keyboardType={keyboard}
           placeholder={keyboard === "default" ? "YYYY-MM-DD" : "—"}
           placeholderTextColor="#A3A8A6"
@@ -377,10 +394,14 @@ async function runSave(
   }
 }
 
-function optionalNumber(value: string) {
+function optionalNumber(value: string, max = Number.POSITIVE_INFINITY) {
   if (!value.trim()) return null;
   const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  return Number.isFinite(parsed) && parsed > 0 && parsed <= max ? parsed : null;
+}
+
+function invalidOptional(value: string, max: number) {
+  return value.trim().length > 0 && optionalNumber(value, max) === null;
 }
 
 function stringValue(value: string | number | null | undefined) {
@@ -388,7 +409,11 @@ function stringValue(value: string | number | null | undefined) {
 }
 
 function validDate(value: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T12:00:00`));
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return /^\d{4}-\d{2}-\d{2}$/.test(value)
+    && Number.isFinite(parsed.getTime())
+    && parsed.toISOString().slice(0, 10) === value
+    && value <= today();
 }
 
 function today() {

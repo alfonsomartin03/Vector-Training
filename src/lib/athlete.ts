@@ -9,6 +9,25 @@ import type {
 import { supabase } from "./supabase";
 import { classifyTrainingFocus } from "./training/focus";
 
+const PROFILE_COLUMNS = [
+  "id",
+  "first_name",
+  "last_name",
+  "gender",
+  "birth_date",
+  "weight_kg",
+  "primary_sport",
+  "training_history",
+  "weekly_volume",
+  "training_focus",
+  "training_focus_tag",
+  "training_focus_revision",
+].join(",");
+
+const POWER_COLUMNS = "id,user_id,one_minute_watts,five_minute_watts,twelve_minute_watts,maximal_efforts_confirmed,recorded_at";
+const VO2_COLUMNS = "id,user_id,relative_vo2max,absolute_vo2_l_min,body_mass_kg,vt1_power_watts,vt2_power_watts,max_aerobic_power_watts,test_date,source,created_at";
+const LACTATE_COLUMNS = "id,user_id,lt1_power_watts,lt1_heart_rate_bpm,lt1_lactate_mmol,lt2_power_watts,lt2_heart_rate_bpm,lt2_lactate_mmol,test_date,source,created_at";
+
 export async function getAthleteData(
   userId: string
 ): Promise<AthleteData> {
@@ -48,140 +67,49 @@ async function getAthleteDataOnce(
   userId: string,
   retries = 1,
 ): Promise<AthleteData> {
-  /*
-   * Load the athlete's profile.
-   *
-   * profiles.id is the Supabase Auth user ID.
-   */
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", userId)
-    .single();
-
-  const powerProfileRequest = supabase
-    .from("power_profiles")
-    .select(
-      "id, user_id, one_minute_watts, five_minute_watts, twelve_minute_watts, maximal_efforts_confirmed, recorded_at"
-    )
-    .eq("user_id", userId)
-    .order("recorded_at", { ascending: false, nullsFirst: false })
-    .order("id", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const vo2MaxRequest = supabase
-    .from("vo2max_tests")
-    .select(
-      "id, user_id, relative_vo2max, absolute_vo2_l_min, body_mass_kg, vt1_power_watts, vt2_power_watts, max_aerobic_power_watts, test_date, source, created_at"
-    )
-    .eq("user_id", userId)
-    .order("test_date", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const lactateRequest = supabase
-    .from("lactate_tests")
-    .select(
-      "id, user_id, lt1_power_watts, lt1_heart_rate_bpm, lt1_lactate_mmol, lt2_power_watts, lt2_heart_rate_bpm, lt2_lactate_mmol, test_date, source, created_at"
-    )
-    .eq("user_id", userId)
-    .order("test_date", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const powerHistoryRequest = supabase
-    .from("power_profiles")
-    .select("id, user_id, one_minute_watts, five_minute_watts, twelve_minute_watts, maximal_efforts_confirmed, recorded_at")
-    .eq("user_id", userId)
-    .order("recorded_at", { ascending: false, nullsFirst: false })
-    .order("id", { ascending: false })
-    .limit(25);
-
-  const vo2HistoryRequest = supabase
-    .from("vo2max_tests")
-    .select("id, user_id, relative_vo2max, absolute_vo2_l_min, body_mass_kg, vt1_power_watts, vt2_power_watts, max_aerobic_power_watts, test_date, source, created_at")
-    .eq("user_id", userId)
-    .order("test_date", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(25);
-
-  const lactateHistoryRequest = supabase
-    .from("lactate_tests")
-    .select("id, user_id, lt1_power_watts, lt1_heart_rate_bpm, lt1_lactate_mmol, lt2_power_watts, lt2_heart_rate_bpm, lt2_lactate_mmol, test_date, source, created_at")
-    .eq("user_id", userId)
-    .order("test_date", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(25);
-
+  // Fetch each relation once. The first history row is also the current value,
+  // which avoids three duplicate round trips on every dashboard/page refresh.
   const [
-    { data: powerProfile, error: powerProfileError },
-    { data: vo2MaxTest, error: vo2MaxError },
-    { data: lactateTest, error: lactateError },
+    { data: profile, error: profileError },
     { data: powerHistory, error: powerHistoryError },
     { data: vo2MaxHistory, error: vo2HistoryError },
     { data: lactateHistory, error: lactateHistoryError },
   ] = await Promise.all([
-    powerProfileRequest,
-    vo2MaxRequest,
-    lactateRequest,
-    powerHistoryRequest,
-    vo2HistoryRequest,
-    lactateHistoryRequest,
+    supabase.from("profiles").select(PROFILE_COLUMNS).eq("id", userId).single(),
+    supabase.from("power_profiles").select(POWER_COLUMNS).eq("user_id", userId)
+      .order("recorded_at", { ascending: false, nullsFirst: false }).order("id", { ascending: false }).limit(25),
+    supabase.from("vo2max_tests").select(VO2_COLUMNS).eq("user_id", userId)
+      .order("test_date", { ascending: false }).order("created_at", { ascending: false }).limit(25),
+    supabase.from("lactate_tests").select(LACTATE_COLUMNS).eq("user_id", userId)
+      .order("test_date", { ascending: false }).order("created_at", { ascending: false }).limit(25),
   ]);
 
   if (profileError) {
-    throw new Error(
-      `Unable to load athlete profile: ${profileError.message}`
-    );
-  }
-
-  if (powerProfileError) {
-    throw new Error(
-      `Unable to load power profile: ${powerProfileError.message}`
-    );
-  }
-
-  if (vo2MaxError && !isMissingRelationError(vo2MaxError.code)) {
-    throw new Error(`Unable to load VO₂max data: ${vo2MaxError.message}`);
-  }
-
-  if (lactateError && !isMissingRelationError(lactateError.code)) {
-    throw new Error(`Unable to load lactate data: ${lactateError.message}`);
+    throw new Error("Unable to load athlete profile.");
   }
 
   if (powerHistoryError) {
-    throw new Error(`Unable to load power progress: ${powerHistoryError.message}`);
+    throw new Error("Unable to load power progress.");
   }
   if (vo2HistoryError && !isMissingRelationError(vo2HistoryError.code)) {
-    throw new Error(`Unable to load VO₂max progress: ${vo2HistoryError.message}`);
+    throw new Error("Unable to load VO₂max progress.");
   }
   if (lactateHistoryError && !isMissingRelationError(lactateHistoryError.code)) {
-    throw new Error(`Unable to load lactate progress: ${lactateHistoryError.message}`);
+    throw new Error("Unable to load lactate progress.");
   }
 
+  const typedPowerHistory = (powerHistory ?? []) as PowerProfile[];
+  const typedVo2History = (vo2MaxHistory ?? []) as Vo2MaxTest[];
+  const typedLactateHistory = (lactateHistory ?? []) as LactateTest[];
+
   const athlete: AthleteData = {
-    profile: profile as AthleteProfile,
-    powerProfile: powerProfile as PowerProfile | null,
-    vo2MaxTest: (vo2MaxTest as Vo2MaxTest | null) ?? null,
-    lactateTest: (lactateTest as LactateTest | null) ?? null,
-    powerHistory: Array.isArray(powerHistory)
-      ? powerHistory as PowerProfile[]
-      : powerProfile
-        ? [powerProfile as PowerProfile]
-        : [],
-    vo2MaxHistory: Array.isArray(vo2MaxHistory)
-      ? vo2MaxHistory as Vo2MaxTest[]
-      : vo2MaxTest
-        ? [vo2MaxTest as Vo2MaxTest]
-        : [],
-    lactateHistory: Array.isArray(lactateHistory)
-      ? lactateHistory as LactateTest[]
-      : lactateTest
-        ? [lactateTest as LactateTest]
-        : [],
+    profile: profile as unknown as AthleteProfile,
+    powerProfile: typedPowerHistory[0] ?? null,
+    vo2MaxTest: typedVo2History[0] ?? null,
+    lactateTest: typedLactateHistory[0] ?? null,
+    powerHistory: typedPowerHistory,
+    vo2MaxHistory: typedVo2History,
+    lactateHistory: typedLactateHistory,
   };
   const focus = classifyTrainingFocus(athlete);
   if (athlete.profile.training_focus_revision == null) {
@@ -199,7 +127,7 @@ async function getAthleteDataOnce(
     .maybeSingle();
   if (!saveError && !saved && retries > 0) return getAthleteDataOnce(userId, retries - 1);
   if (saveError || !saved) {
-    console.error("Unable to save training focus:", saveError?.message ?? "Power data changed during classification");
+    console.error("Unable to save training focus.");
     return {
       ...athlete,
       profile: { ...athlete.profile, training_focus: null, training_focus_tag: null },
@@ -246,9 +174,7 @@ export async function updatePowerProfile(
     .single();
 
   if (error) {
-    throw new Error(
-      `Unable to update power profile: ${error.message}`
-    );
+    throw new Error("Unable to update power profile. Check the values and retry.");
   }
 
   return data as PowerProfile;
@@ -278,7 +204,7 @@ export async function saveVo2MaxTest(
     .single();
 
   if (error) {
-    throw new Error(`Unable to save VO₂max test: ${error.message}`);
+    throw new Error("Unable to save the VO₂max test. Check the values and retry.");
   }
 
   return data as Vo2MaxTest;
@@ -308,7 +234,7 @@ export async function saveLactateTest(
     .single();
 
   if (error) {
-    throw new Error(`Unable to save lactate test: ${error.message}`);
+    throw new Error("Unable to save the lactate test. Check the values and retry.");
   }
 
   return data as LactateTest;

@@ -37,7 +37,7 @@ function setup(overrides = {}) {
     changes, handler,
     async request(body, token = "admin") {
       const response = await handler(new Request("https://example.com/accounts", {
-        method: "POST", headers: token ? { Authorization: `Bearer ${token}` } : {}, body: JSON.stringify(body),
+        method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body),
       }));
       return { status: response.status, body: await response.json() };
     },
@@ -114,9 +114,28 @@ test("malformed and oversized bodies fail without mutations; preflight needs no 
   const preflight = await api.handler(new Request("https://example.com", { method: "OPTIONS" }));
   assert.equal(preflight.status, 204);
   assert.equal((await api.handler(new Request("https://example.com"))).status, 405);
-  assert.equal((await api.handler(new Request("https://example.com", { method: "POST", headers: { Authorization: "Bearer admin" }, body: "bad json" }))).status, 400);
+  assert.equal((await api.handler(new Request("https://example.com", { method: "POST", headers: { Authorization: "Bearer admin", "Content-Type": "application/json" }, body: "bad json" }))).status, 400);
+  assert.equal((await api.handler(new Request("https://example.com", { method: "POST", headers: { Authorization: "Bearer admin", "Content-Type": "text/plain" }, body: "{}" }))).status, 415);
   assert.equal((await api.request({ action: "list", extra: "x".repeat(17000) })).status, 413);
   assert.equal(api.changes.length, 0);
+});
+
+test("browser callers must use an explicitly allowed origin", async () => {
+  const api = setup();
+  const allowed = await api.handler(new Request("https://example.com", {
+    method: "OPTIONS",
+    headers: { Origin: "https://www.vectortrain.me" },
+  }));
+  assert.equal(allowed.status, 204);
+  assert.equal(allowed.headers.get("Access-Control-Allow-Origin"), "https://www.vectortrain.me");
+
+  const blocked = await api.handler(new Request("https://example.com", {
+    method: "POST",
+    headers: { Origin: "https://malicious.example", Authorization: "Bearer admin", "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "list" }),
+  }));
+  assert.equal(blocked.status, 403);
+  assert.equal(blocked.headers.get("Access-Control-Allow-Origin"), null);
 });
 
 function deletionAdapter({ objects = [], failFiles = false, failAuth = false } = {}) {

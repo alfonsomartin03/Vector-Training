@@ -25,10 +25,13 @@ type Props = {
 const CHART_WIDTH = 520;
 const CHART_HEIGHT = 190;
 const CHART_PADDING = { top: 16, right: 16, bottom: 16, left: 48 };
+const MAX_VISIBLE_POINTS = 5;
 const SERIES_COLORS = [theme.colors.accent, "#D68C45"] as const;
 
 export function MetricTrendModal({ visible, title, description, unit, series, onClose }: Props) {
-  const populatedSeries = series.filter((item) => item.points.length > 0);
+  const populatedSeries = limitSeriesToLatestPoints(series);
+  const totalPointCount = countUniquePoints(series);
+  const visiblePointCount = countUniquePoints(populatedSeries);
 
   return (
     <Modal
@@ -87,7 +90,7 @@ export function MetricTrendModal({ visible, title, description, unit, series, on
                 <Text style={styles.dateText}>{formatBoundaryDate(populatedSeries, "newest")}</Text>
               </View>
               <Text style={styles.note}>
-                {countUniquePoints(populatedSeries)} recorded {countUniquePoints(populatedSeries) === 1 ? "data point" : "data points"}
+                {totalPointCount > visiblePointCount ? `Latest ${visiblePointCount} of ${totalPointCount}` : visiblePointCount} recorded {totalPointCount === 1 ? "data point" : "data points"}
               </Text>
             </>
           ) : (
@@ -193,6 +196,24 @@ function formatBoundaryDate(series: TrendGraphSeries[], boundary: "oldest" | "ne
 
 function countUniquePoints(series: TrendGraphSeries[]) {
   return new Set(series.flatMap((item) => item.points.map((point, index) => point.date ?? `${item.label}-${index}`))).size;
+}
+
+function limitSeriesToLatestPoints(series: TrendGraphSeries[]) {
+  const latestDates = [...new Set(
+    series.flatMap((item) => item.points.map((point) => point.date).filter((date): date is string => Boolean(date)))
+  )]
+    .sort((first, second) => new Date(second).getTime() - new Date(first).getTime())
+    .slice(0, MAX_VISIBLE_POINTS);
+  const includedDates = new Set(latestDates);
+
+  return series
+    .map((item) => ({
+      ...item,
+      points: latestDates.length
+        ? item.points.filter((point) => point.date && includedDates.has(point.date))
+        : item.points.slice(0, MAX_VISIBLE_POINTS),
+    }))
+    .filter((item) => item.points.length > 0);
 }
 
 function formatReferenceValue(value: number, range: number) {

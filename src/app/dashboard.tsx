@@ -299,7 +299,6 @@ function MetricCard({
       </View>
       <Text style={styles.metricDetail}>{detail}</Text>
       {value !== "—" && value !== "..." ? <MetricTrend trend={trend} /> : null}
-      <View style={styles.metricAccent} />
     </Pressable>
   );
 }
@@ -518,13 +517,6 @@ const styles = StyleSheet.create({
   },
   metricUnit: { color: theme.colors.textSecondary, fontSize: 13, marginLeft: 5 },
   metricDetail: { color: theme.colors.textSecondary, fontSize: 10, marginTop: 4 },
-  metricAccent: {
-    width: 32,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: theme.colors.accent,
-    marginTop: "auto",
-  },
   workoutCard: {
     borderRadius: 20,
     padding: 24,

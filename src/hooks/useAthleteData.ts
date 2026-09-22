@@ -1,7 +1,8 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 
 import { getAthleteData } from "../lib/athlete";
+import { supabase } from "../lib/supabase";
 import type { AthleteData } from "../types/athlete";
 
 export function useAthleteData(
@@ -71,6 +72,22 @@ export function useAthleteData(
       requestSequence.current++;
     };
   }, [errorMessage, logLabel, userId]));
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`athlete-progress:${userId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "power_profiles", filter: `user_id=eq.${userId}` }, refreshAthlete)
+      .on("postgres_changes", { event: "*", schema: "public", table: "vo2max_tests", filter: `user_id=eq.${userId}` }, refreshAthlete)
+      .on("postgres_changes", { event: "*", schema: "public", table: "lactate_tests", filter: `user_id=eq.${userId}` }, refreshAthlete)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${userId}` }, refreshAthlete)
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [refreshAthlete, userId]);
 
   // Never display a previous account's cached profile after sign-out/user switching.
   return { athlete: athlete?.profile.id === userId ? athlete : null, setAthlete, refreshAthlete, isLoading, error };

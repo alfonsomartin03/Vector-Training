@@ -13,6 +13,7 @@ import { useMemo, useState } from "react";
 
 import { theme } from "../constants/theme";
 import { AccountDeletePanel } from "../components/AccountDeletePanel";
+import { MetricTrend } from "../components/MetricTrend";
 import { useAdminAccess } from "../hooks/useAdminAccess";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
@@ -23,6 +24,7 @@ import {
 import { useAthleteData } from "../hooks/useAthleteData";
 
 import { buildAthleteModel } from "../lib/physiology/athleteModel";
+import { buildAthleteProgress, type MetricTrend as MetricTrendValue } from "../lib/physiology/progress";
 import { getTrainingFocusDisplay } from "../lib/training/focus";
 import { useTrainingAvailability } from "../hooks/useTrainingAvailability";
 import { weekKey } from "../lib/training/prescription";
@@ -62,6 +64,10 @@ export default function ProfilePage() {
 
   const athleteModel = useMemo(
     () => (athlete ? buildAthleteModel(athlete) : null),
+    [athlete]
+  );
+  const progress = useMemo(
+    () => (athlete ? buildAthleteProgress(athlete) : null),
     [athlete]
   );
 
@@ -252,6 +258,7 @@ export default function ProfilePage() {
                     ? `${athleteModel.vo2Max.toFixed(1)} mL/kg/min`
                     : "—"
               }
+              trend={progress?.vo2Max ?? null}
             />
           </View>
 
@@ -337,6 +344,7 @@ export default function ProfilePage() {
                     ? `${powerProfile.one_minute_watts} W`
                     : "—"}
               </Text>
+              {!isLoadingProfile && powerProfile?.one_minute_watts != null ? <MetricTrend trend={progress?.oneMinutePower ?? null} compact /> : null}
             </View>
 
             <View style={styles.modelDivider} />
@@ -351,6 +359,7 @@ export default function ProfilePage() {
                     ? `${powerProfile.five_minute_watts} W`
                     : "—"}
               </Text>
+              {!isLoadingProfile && powerProfile?.five_minute_watts != null ? <MetricTrend trend={progress?.fiveMinutePower ?? null} compact /> : null}
             </View>
 
             <View style={styles.modelDivider} />
@@ -365,6 +374,7 @@ export default function ProfilePage() {
                     ? `${powerProfile.twelve_minute_watts} W`
                     : "—"}
               </Text>
+              {!isLoadingProfile && powerProfile?.twelve_minute_watts != null ? <MetricTrend trend={progress?.twelveMinutePower ?? null} compact /> : null}
             </View>
           </View>
 
@@ -554,11 +564,13 @@ function formatWeeklyVolume(
 type QuickStatProps = {
   label: string;
   value: string;
+  trend?: MetricTrendValue | null;
 };
 
 function QuickStat({
   label,
   value,
+  trend,
 }: QuickStatProps) {
   return (
     <View style={styles.quickStat}>
@@ -569,6 +581,7 @@ function QuickStat({
       <Text style={styles.quickValue}>
         {value}
       </Text>
+      {trend !== undefined && value !== "—" && value !== "..." ? <MetricTrend trend={trend} compact /> : null}
     </View>
   );
 }

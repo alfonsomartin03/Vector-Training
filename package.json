@@ -40,7 +40,8 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.functions.json",
     "test:workouts": "node --test tests/workouts.test.cjs",
     "test:admin": "node --test tests/admin.test.cjs tests/adminDatabase.test.cjs",
-    "test:focus": "node --test tests/trainingFocus.test.cjs tests/trainingFocusDatabase.test.cjs"
+    "test:focus": "node --test tests/trainingFocus.test.cjs tests/trainingFocusDatabase.test.cjs",
+    "test:progress": "node --test tests/progress.test.cjs"
   },
   "private": true
 }

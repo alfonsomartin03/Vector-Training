@@ -10,9 +10,11 @@ import {
 } from "react-native";
 
 import { theme } from "../constants/theme";
+import { MetricTrend } from "../components/MetricTrend";
 import { useAuth } from "../context/AuthContext";
 import { useAthleteData } from "../hooks/useAthleteData";
 import { buildAthleteModel } from "../lib/physiology/athleteModel";
+import { buildAthleteProgress, type MetricTrend as MetricTrendValue } from "../lib/physiology/progress";
 import { getTrainingFocusDisplay } from "../lib/training/focus";
 import { useTrainingAvailability } from "../hooks/useTrainingAvailability";
 import { prescribeWeek, weekKey } from "../lib/training/prescription";
@@ -32,6 +34,10 @@ export default function DashboardPage() {
   );
   const model = useMemo(
     () => (athlete ? buildAthleteModel(athlete) : null),
+    [athlete]
+  );
+  const progress = useMemo(
+    () => (athlete ? buildAthleteProgress(athlete) : null),
     [athlete]
   );
   const availability = useTrainingAvailability(user?.id, weekKey());
@@ -86,12 +92,14 @@ export default function DashboardPage() {
               value={isLoading ? "..." : model ? `${Math.round(model.cpWatts)}` : "—"}
               unit="W"
               detail={model ? `${model.cpWattsPerKg.toFixed(2)} W/kg` : "Add power data"}
+              trend={progress?.criticalPower ?? null}
             />
             <MetricCard
               label="W′"
               value={isLoading ? "..." : model ? model.wPrimeKj.toFixed(1) : "—"}
               unit="kJ"
               detail={model ? "Work capacity above CP" : "Add power data"}
+              trend={progress?.wPrime ?? null}
             />
             <MetricCard
               label="VO₂max"
@@ -102,6 +110,7 @@ export default function DashboardPage() {
                   ? `${model.vo2MaxSource === "measured" ? "Measured" : "Estimated"} · mL/kg/min`
                   : "Add power or lab data"
               }
+              trend={progress?.vo2Max ?? null}
             />
           </View>
 
@@ -203,11 +212,13 @@ function MetricCard({
   value,
   unit,
   detail,
+  trend,
 }: {
   label: string;
   value: string;
   unit: string;
   detail: string;
+  trend: MetricTrendValue | null;
 }) {
   return (
     <Pressable
@@ -223,6 +234,7 @@ function MetricCard({
         {unit ? <Text style={styles.metricUnit}>{unit}</Text> : null}
       </View>
       <Text style={styles.metricDetail}>{detail}</Text>
+      {value !== "—" && value !== "..." ? <MetricTrend trend={trend} /> : null}
       <View style={styles.metricAccent} />
     </Pressable>
   );

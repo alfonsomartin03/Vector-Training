@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -11,10 +11,15 @@ import {
 
 import { theme } from "../constants/theme";
 import { MetricTrend } from "../components/MetricTrend";
+import { MetricTrendModal } from "../components/MetricTrendModal";
 import { useAuth } from "../context/AuthContext";
 import { useAthleteData } from "../hooks/useAthleteData";
 import { buildAthleteModel } from "../lib/physiology/athleteModel";
-import { buildAthleteProgress, type MetricTrend as MetricTrendValue } from "../lib/physiology/progress";
+import {
+  buildAthleteProgress,
+  buildAthleteProgressHistory,
+  type MetricTrend as MetricTrendValue,
+} from "../lib/physiology/progress";
 import { getTrainingFocusDisplay } from "../lib/training/focus";
 import { useTrainingAvailability } from "../hooks/useTrainingAvailability";
 import { prescribeWeek, weekKey } from "../lib/training/prescription";
@@ -40,6 +45,11 @@ export default function DashboardPage() {
     () => (athlete ? buildAthleteProgress(athlete) : null),
     [athlete]
   );
+  const progressHistory = useMemo(
+    () => (athlete ? buildAthleteProgressHistory(athlete) : null),
+    [athlete]
+  );
+  const [selectedMetric, setSelectedMetric] = useState<DashboardMetric | null>(null);
   const availability = useTrainingAvailability(user?.id, weekKey());
   const prescription = useMemo(() => prescribeWeek(athlete, availability.availability), [athlete, availability.availability]);
   const week = buildWeeklyTrainingPlan(new Date(), prescription.assignments);
@@ -93,6 +103,7 @@ export default function DashboardPage() {
               unit="W"
               detail={model ? `${model.cpWattsPerKg.toFixed(2)} W/kg` : "Add power data"}
               trend={progress?.criticalPower ?? null}
+              onPress={() => setSelectedMetric("criticalPower")}
             />
             <MetricCard
               label="W′"
@@ -100,6 +111,7 @@ export default function DashboardPage() {
               unit="kJ"
               detail={model ? "Work capacity above CP" : "Add power data"}
               trend={progress?.wPrime ?? null}
+              onPress={() => setSelectedMetric("wPrime")}
             />
             <MetricCard
               label="VO₂max"
@@ -111,6 +123,7 @@ export default function DashboardPage() {
                   : "Add power or lab data"
               }
               trend={progress?.vo2Max ?? null}
+              onPress={() => setSelectedMetric("vo2Max")}
             />
           </View>
 
@@ -173,9 +186,56 @@ export default function DashboardPage() {
       </ScrollView>
 
       <BottomNav />
+      {selectedMetric ? (
+        <MetricTrendModal
+          visible
+          title={DASHBOARD_METRICS[selectedMetric].title}
+          description={DASHBOARD_METRICS[selectedMetric].description}
+          unit={DASHBOARD_METRICS[selectedMetric].unit}
+          series={[{
+            label: DASHBOARD_METRICS[selectedMetric].seriesLabel,
+            points: progressHistory?.[selectedMetric] ?? [],
+            trend: progress?.[selectedMetric] ?? null,
+            decimals: DASHBOARD_METRICS[selectedMetric].decimals,
+          }]}
+          onClose={() => setSelectedMetric(null)}
+        />
+      ) : null}
     </View>
   );
 }
+
+type DashboardMetric = "criticalPower" | "wPrime" | "vo2Max";
+
+const DASHBOARD_METRICS: Record<DashboardMetric, {
+  title: string;
+  description: string;
+  unit: string;
+  seriesLabel: string;
+  decimals: number;
+}> = {
+  criticalPower: {
+    title: "Critical Power",
+    description: "Your modeled sustainable power across recorded maximal-effort tests.",
+    unit: "W",
+    seriesLabel: "CP",
+    decimals: 0,
+  },
+  wPrime: {
+    title: "W′",
+    description: "Your modeled work capacity above critical power over time.",
+    unit: "kJ",
+    seriesLabel: "W′",
+    decimals: 1,
+  },
+  vo2Max: {
+    title: "VO₂max",
+    description: "Measured VO₂max history when available, otherwise your power-based estimate.",
+    unit: "mL/kg/min",
+    seriesLabel: "VO₂max",
+    decimals: 1,
+  },
+};
 
 function SectionHeader({
   eyebrow,
@@ -213,21 +273,25 @@ function MetricCard({
   unit,
   detail,
   trend,
+  onPress,
 }: {
   label: string;
   value: string;
   unit: string;
   detail: string;
   trend: MetricTrendValue | null;
+  onPress: () => void;
 }) {
   return (
     <Pressable
-      onPress={() => router.push("/power")}
+      accessibilityLabel={`View ${label} trend`}
+      accessibilityRole="button"
+      onPress={onPress}
       style={({ pressed }) => [styles.metricCard, pressed ? styles.pressed : undefined]}
     >
       <View style={styles.metricHeader}>
         <Text style={styles.metricLabel}>{label}</Text>
-        <Text style={styles.metricArrow}>→</Text>
+        <Text style={styles.metricArrow}>⌁</Text>
       </View>
       <View style={styles.metricReading}>
         <Text style={styles.metricValue}>{value}</Text>

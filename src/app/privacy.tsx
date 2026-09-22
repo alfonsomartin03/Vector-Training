@@ -1,6 +1,7 @@
-import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 
 import { MarketingHeader } from "../components/MarketingHeader";
+import { openPrivacyChoices } from "../components/PrivacyConsent";
 import { theme } from "../constants/theme";
 
 const LAST_UPDATED = "September 18, 2026";
@@ -102,6 +103,9 @@ export default function PrivacyPage() {
             <Paragraph>
               Vector may use browser or device storage that is necessary to maintain authentication, remember application state, and provide core functionality. We do not currently use this information to serve third-party behavioral advertising.
             </Paragraph>
+            <Pressable accessibilityRole="button" onPress={openPrivacyChoices} style={styles.choicesButton}>
+              <Text style={styles.choicesButtonText}>Review privacy choices</Text>
+            </Pressable>
           </Section>
 
           <Section title="7. Children’s privacy">
@@ -254,6 +258,16 @@ const styles = StyleSheet.create({
   sectionTitle: { color: theme.colors.text, fontSize: 22, fontWeight: "700", letterSpacing: -0.3 },
   sectionBody: { marginTop: 15, gap: 13 },
   paragraph: { color: theme.colors.textSecondary, fontSize: 14, lineHeight: 23 },
+  choicesButton: {
+    alignSelf: "flex-start",
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  choicesButtonText: { color: theme.colors.text, fontSize: 13, fontWeight: "700" },
   bulletRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
   bullet: {
     width: 6,

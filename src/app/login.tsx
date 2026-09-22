@@ -1,3 +1,4 @@
+import * as Linking from "expo-linking";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
@@ -21,7 +22,32 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
 
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  async function handleForgotPassword() {
+    const cleanEmail = email.trim().toLowerCase();
+    setError(null);
+    setNotice(null);
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setError("Enter your email address first, then request a password reset.");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+        redirectTo: Linking.createURL("/reset-password"),
+      });
+      if (resetError) throw resetError;
+      setNotice("If an account exists for that email, a password-reset link is on its way.");
+    } catch {
+      setError("We couldn't send a password-reset email. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   async function handleLogin() {
     // Prevent multiple login requests
@@ -135,9 +161,10 @@ export default function LoginPage() {
               <Text style={styles.label}>Email</Text>
 
               <TextInput
+                accessibilityLabel="Email address"
                 style={styles.input}
                 placeholder="you@example.com"
-                placeholderTextColor="#A0A5A3"
+                placeholderTextColor="#62686B"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -146,6 +173,7 @@ export default function LoginPage() {
                 onChangeText={setEmail}
                 editable={!isLoading}
                 returnKeyType="next"
+                maxLength={254}
               />
             </View>
 
@@ -154,9 +182,10 @@ export default function LoginPage() {
               <Text style={styles.label}>Password</Text>
 
               <TextInput
+                accessibilityLabel="Password"
                 style={styles.input}
                 placeholder="Enter your password"
-                placeholderTextColor="#A0A5A3"
+                placeholderTextColor="#62686B"
                 secureTextEntry
                 autoCapitalize="none"
                 autoComplete="password"
@@ -165,12 +194,14 @@ export default function LoginPage() {
                 editable={!isLoading}
                 returnKeyType="done"
                 onSubmitEditing={handleLogin}
+                maxLength={128}
               />
             </View>
 
             <Pressable
               style={styles.forgotButton}
-              onPress={() => {}}
+              accessibilityRole="button"
+              onPress={handleForgotPassword}
               disabled={isLoading}
             >
               <Text style={styles.forgotText}>
@@ -181,7 +212,13 @@ export default function LoginPage() {
             {/* Authentication error */}
             {error ? (
               <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{error}</Text>
+                <Text accessibilityRole="alert" style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+
+            {notice ? (
+              <View style={styles.noticeContainer}>
+                <Text accessibilityRole="alert" style={styles.noticeText}>{notice}</Text>
               </View>
             ) : null}
 
@@ -374,6 +411,22 @@ const styles = StyleSheet.create({
 
   errorText: {
     color: "#A63D40",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+
+  noticeContainer: {
+    backgroundColor: theme.colors.accentSoft,
+    borderWidth: 1,
+    borderColor: theme.colors.accent,
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    marginBottom: 16,
+  },
+
+  noticeText: {
+    color: "#176B59",
     fontSize: 12,
     lineHeight: 18,
   },

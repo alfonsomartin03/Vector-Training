@@ -4,6 +4,8 @@
 
 A cross-platform cycling training app that builds an evolving physiological model of each rider using **Critical Power (CP), W′, power-duration data, and estimated VO₂max**.
 
+Website launch requirements and verification steps are documented in [docs/website-compliance.md](docs/website-compliance.md). Run `npm run check:compliance` before deployment.
+
 Instead of prescribing workouts from a single FTP value, the app identifies **what is currently limiting the rider**, selects an appropriate training stimulus, and generates workouts around the athlete's actual power profile.
 
 ## Development

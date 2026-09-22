@@ -120,6 +120,9 @@ export default function RegisterScreen() {
 
   const [accountError, setAccountError] =
     useState<string | null>(null);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [website, setWebsite] = useState("");
+  const [registrationStartedAt] = useState(() => Date.now());
 
   /*
    * State for final onboarding submission.
@@ -167,7 +170,8 @@ export default function RegisterScreen() {
     data.account.lastName.trim().length > 0 &&
     emailValid &&
     passwordStrong &&
-    passwordsMatch;
+    passwordsMatch &&
+    acceptedTerms;
 
   const physiologicalValid =
     data.physiological.gender !== "" &&
@@ -239,6 +243,13 @@ export default function RegisterScreen() {
      */
     if (createdUserId) {
       animateToStep(1);
+      return;
+    }
+
+    // A hidden honeypot and minimum interaction time reject common automated
+    // submissions without collecting an additional identifier from people.
+    if (website || Date.now() - registrationStartedAt < 1200) {
+      setAccountError("We couldn't verify this submission. Please wait a moment and try again.");
       return;
     }
 
@@ -549,6 +560,10 @@ export default function RegisterScreen() {
                       createdUserId
                     )
                   }
+                  acceptedTerms={acceptedTerms}
+                  onAcceptedTermsChange={setAcceptedTerms}
+                  website={website}
+                  onWebsiteChange={setWebsite}
                 />
               )}
 
@@ -722,6 +737,10 @@ function AccountStep({
   accountError,
   isCreatingAccount,
   accountCreated,
+  acceptedTerms,
+  onAcceptedTermsChange,
+  website,
+  onWebsiteChange,
 }: StepProps & {
   emailValid: boolean;
 
@@ -746,6 +765,10 @@ function AccountStep({
   isCreatingAccount: boolean;
 
   accountCreated: boolean;
+  acceptedTerms: boolean;
+  onAcceptedTermsChange: (value: boolean) => void;
+  website: string;
+  onWebsiteChange: (value: string) => void;
 }) {
   const updateAccount = (
     field: keyof RegistrationData["account"],
@@ -771,6 +794,16 @@ function AccountStep({
 
   return (
     <>
+      <TextInput
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        accessibilityLabel="Website"
+        autoComplete="off"
+        autoCapitalize="none"
+        value={website}
+        onChangeText={onWebsiteChange}
+        style={styles.honeypot}
+      />
       <Text style={styles.eyebrow}>
         STEP 1 OF 3
       </Text>
@@ -832,6 +865,7 @@ function AccountStep({
             }
             placeholder="First"
             autoCapitalize="words"
+            maxLength={100}
             editable={
               !accountCreated
             }
@@ -856,6 +890,7 @@ function AccountStep({
             }
             placeholder="Last"
             autoCapitalize="words"
+            maxLength={100}
             editable={
               !accountCreated
             }
@@ -876,6 +911,7 @@ function AccountStep({
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
+        maxLength={254}
         editable={!accountCreated}
       />
 
@@ -907,6 +943,7 @@ function AccountStep({
         allowPasswordToggle
         autoCapitalize="none"
         autoCorrect={false}
+        maxLength={128}
         editable={!accountCreated}
       />
 
@@ -971,6 +1008,7 @@ function AccountStep({
         allowPasswordToggle
         autoCapitalize="none"
         autoCorrect={false}
+        maxLength={128}
         editable={!accountCreated}
       />
 
@@ -987,6 +1025,26 @@ function AccountStep({
             Passwords do not match.
           </Text>
         )}
+
+      <Pressable
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: acceptedTerms }}
+        disabled={accountCreated}
+        onPress={() => onAcceptedTermsChange(!acceptedTerms)}
+        style={styles.consentRow}
+      >
+        <View style={[styles.termsCheckbox, acceptedTerms && styles.termsCheckboxChecked]}>
+          {acceptedTerms ? <Text style={styles.checkboxMark}>✓</Text> : null}
+        </View>
+        <Text style={styles.consentText}>
+          I agree to the Terms and Conditions and acknowledge the Privacy Policy.
+        </Text>
+      </Pressable>
+
+      <View style={styles.policyLinks}>
+        <Pressable accessibilityRole="link" onPress={() => router.push("/terms")}><Text style={styles.loginLink}>Read terms</Text></Pressable>
+        <Pressable accessibilityRole="link" onPress={() => router.push("/privacy")}><Text style={styles.loginLink}>Read privacy policy</Text></Pressable>
+      </View>
 
       {accountError && (
         <View
@@ -1800,7 +1858,7 @@ function FormInput({
             !editable &&
               styles.inputDisabled,
           ]}
-          placeholderTextColor="#A7ADA9"
+          placeholderTextColor="#62686B"
         />
 
         {allowPasswordToggle && (
@@ -2086,7 +2144,7 @@ function PowerInput({
           }
           keyboardType="number-pad"
           placeholder="0"
-          placeholderTextColor="#A7ADA9"
+          placeholderTextColor="#62686B"
           style={
             styles.powerInput
           }
@@ -2485,6 +2543,41 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
+  honeypot: {
+    position: "absolute",
+    left: -10000,
+    width: 1,
+    height: 1,
+    opacity: 0,
+  },
+
+  consentRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+
+  termsCheckbox: {
+    width: 22,
+    height: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "#929792",
+    borderRadius: 5,
+  },
+
+  termsCheckboxChecked: {
+    backgroundColor: theme.colors.accent,
+    borderColor: theme.colors.accent,
+  },
+
+  checkboxMark: { color: theme.colors.white, fontSize: 14, fontWeight: "800" },
+  consentText: { flex: 1, color: theme.colors.textSecondary, fontSize: 13, lineHeight: 20 },
+  policyLinks: { flexDirection: "row", flexWrap: "wrap", gap: 18, marginBottom: 18 },
+
   label: {
     color:
       theme.colors.textSecondary,
@@ -2561,7 +2654,7 @@ const styles = StyleSheet.create({
   },
 
   requirementText: {
-    color: "#A7ADA9",
+    color: "#62686B",
     fontSize: 12,
     lineHeight: 21,
   },
@@ -2726,7 +2819,7 @@ const styles = StyleSheet.create({
   },
 
   datePlaceholder: {
-    color: "#A7ADA9",
+    color: "#62686B",
   },
 
   dateIcon: {
@@ -2947,7 +3040,7 @@ const styles = StyleSheet.create({
   },
 
   primaryButtonTextDisabled: {
-    color: "#929792",
+    color: "#62686B",
   },
 
   navigationRow: {

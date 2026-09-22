@@ -957,7 +957,7 @@ const styles = StyleSheet.create({
   },
 
   modelLabel: {
-    color: "#808784",
+    color: "#62686B",
     fontSize: 8,
     fontWeight: "700",
     letterSpacing: 0.8,

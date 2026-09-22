@@ -4,11 +4,12 @@ export const theme = {
     surface: "#FFFFFF",
 
     text: "#111315",
-    textSecondary: "#6F7478",
+    textSecondary: "#62686B",
 
     border: "#E5E7E4",
 
-    accent: "#2FB89D",
+    // Dark enough for WCAG AA normal text on both app backgrounds.
+    accent: "#176B59",
     accentSoft: "#EAF7F3",
 
     white: "#FFFFFF",

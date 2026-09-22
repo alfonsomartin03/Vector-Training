@@ -28,6 +28,9 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
+    "site:prepare": "node scripts/prepare-site-files.mjs",
+    "build:web": "npm run site:prepare && expo export --platform web",
+    "check:compliance": "node scripts/check-compliance.mjs",
     "test:prescription": "node --test tests/prescription.test.cjs tests/availabilityDatabase.test.cjs tests/workoutPreview.test.cjs",
     "start": "expo start",
     "android": "expo start --android",

@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /power
+Disallow: /profile
+Disallow: /training
+
+Sitemap: https://vector-training.vercel.app/sitemap.xml

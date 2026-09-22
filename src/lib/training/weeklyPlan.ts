@@ -1,4 +1,5 @@
 export type WorkoutAssignment = {
+  workout?: import("./workouts").BuiltWorkout;
   id: string;
   title: string;
   detail: string;

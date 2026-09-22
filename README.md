@@ -4,6 +4,8 @@
 
 A cross-platform cycling training app that builds an evolving physiological model of each rider using **Critical Power (CP), W′, power-duration data, and estimated VO₂max**.
 
+Website launch requirements and verification steps are documented in [docs/website-compliance.md](docs/website-compliance.md). Run `npm run check:compliance` before deployment.
+
 Instead of prescribing workouts from a single FTP value, the app identifies **what is currently limiting the rider**, selects an appropriate training stimulus, and generates workouts around the athlete's actual power profile.
 
 ## Development
@@ -19,6 +21,10 @@ npm run web
 Set the two Supabase values in `.env` before starting. Use `npm run typecheck` and `npm run lint` before committing changes.
 
 Database changes are versioned in `supabase/migrations`. Apply pending migrations to the linked Supabase project before deploying application code that depends on them, either with the Supabase CLI or through the project SQL editor.
+
+Weekly availability and suggested workouts require the training-availability migration.
+See [prescription setup, policy and limitations](docs/workout-prescription.md).
+Run `npm run test:prescription` for engine and database-ownership checks.
 
 Admin user management and self-service account deletion require the account
 migration and Supabase `accounts` Edge Function. See [admin setup and deployment](docs/admin-accounts.md)

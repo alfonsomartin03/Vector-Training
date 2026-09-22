@@ -14,9 +14,10 @@ import { useAuth } from "../context/AuthContext";
 import { useAthleteData } from "../hooks/useAthleteData";
 import { buildAthleteModel } from "../lib/physiology/athleteModel";
 import { getTrainingFocusDisplay } from "../lib/training/focus";
+import { useTrainingAvailability } from "../hooks/useTrainingAvailability";
+import { prescribeWeek, weekKey } from "../lib/training/prescription";
 import {
   buildWeeklyTrainingPlan,
-  CURRENT_WORKOUT_ASSIGNMENTS,
   resolveDayWorkout,
 } from "../lib/training/weeklyPlan";
 
@@ -33,10 +34,9 @@ export default function DashboardPage() {
     () => (athlete ? buildAthleteModel(athlete) : null),
     [athlete]
   );
-  const week = useMemo(
-    () => buildWeeklyTrainingPlan(new Date(), CURRENT_WORKOUT_ASSIGNMENTS),
-    []
-  );
+  const availability = useTrainingAvailability(user?.id, weekKey());
+  const prescription = useMemo(() => prescribeWeek(athlete, availability.availability), [athlete, availability.availability]);
+  const week = buildWeeklyTrainingPlan(new Date(), prescription.assignments);
   const today = week.days.find((day) => day.isToday) ?? week.days[0];
   const todayWorkout = resolveDayWorkout(today);
   const focus = getTrainingFocusDisplay(athlete?.profile.training_focus);
@@ -72,6 +72,7 @@ export default function DashboardPage() {
               <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
+          {availability.error ? <Text accessibilityRole="alert">{availability.error}</Text> : !availability.loading && !availability.availability ? <Pressable onPress={() => router.push("/training")}><Text>Set your weekly availability on Training to generate a plan →</Text></Pressable> : null}
 
           <SectionHeader
             eyebrow="CURRENT PROFILE"
@@ -132,7 +133,7 @@ export default function DashboardPage() {
             </View>
 
             <View style={[styles.workoutFooter, compact ? styles.workoutFooterCompact : undefined]}>
-              <Meta label="STATUS" value={today.workout ? "Assigned" : "No workout assigned"} />
+              <Meta label="STATUS" value={availability.loading ? "Loading plan" : availability.error ? "Plan unavailable" : today.workout ? "Suggested" : "No workout assigned"} />
               <Meta label="CURRENT FOCUS" value={isLoading ? "Loading…" : error ? "Focus unavailable" : focus.title} />
               <Meta label="WEEK" value={formatWeekRange(week.startDate, week.endDate)} />
             </View>

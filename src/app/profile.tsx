@@ -24,10 +24,13 @@ import { useAthleteData } from "../hooks/useAthleteData";
 
 import { buildAthleteModel } from "../lib/physiology/athleteModel";
 import { getTrainingFocusDisplay } from "../lib/training/focus";
+import { useTrainingAvailability } from "../hooks/useTrainingAvailability";
+import { weekKey } from "../lib/training/prescription";
 
 export default function ProfilePage() {
   const { user, signOut } = useAuth();
   const { isAdmin } = useAdminAccess();
+  const availability = useTrainingAvailability(user?.id, weekKey());
 
   const {
     athlete,
@@ -274,6 +277,8 @@ export default function ProfilePage() {
               label="Weekly training"
               value={isLoadingProfile ? "..." : trainingVolume}
             />
+            <Row label="Available this week" value={availability.loading ? "..." : availability.error ? "Unavailable" : availability.availability ? `${availability.availability.weekly_minutes / 60} h · ${availability.availability.rest_days.length} preferred rest days` : "Not set"} />
+            <Pressable accessibilityRole="button" onPress={() => router.push("/training")}><Text>Edit weekly availability →</Text></Pressable>
 
             <Row
               label="Max efforts confirmed"
@@ -952,7 +957,7 @@ const styles = StyleSheet.create({
   },
 
   modelLabel: {
-    color: "#808784",
+    color: "#62686B",
     fontSize: 8,
     fontWeight: "700",
     letterSpacing: 0.8,

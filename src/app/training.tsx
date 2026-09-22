@@ -1,6 +1,9 @@
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import {
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,11 +15,15 @@ import {
 import { theme } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
 import { useAthleteData } from "../hooks/useAthleteData";
-import { getTrainingFocusDisplay } from "../lib/training/focus";
+import { classifyTrainingFocus, getTrainingFocusDisplay } from "../lib/training/focus";
+import { WorkoutDetails } from "../components/WorkoutDetails";
+import { useTrainingAvailability } from "../hooks/useTrainingAvailability";
+import { TrainingAvailabilityEditor } from "../components/TrainingAvailabilityEditor";
+import { prescribeWeek, weekKey } from "../lib/training/prescription";
 import {
   buildWeeklyTrainingPlan,
-  CURRENT_WORKOUT_ASSIGNMENTS,
   resolveDayWorkout,
+  toLocalDateKey,
   type TrainingDayPlan,
 } from "../lib/training/weeklyPlan";
 
@@ -28,15 +35,24 @@ export default function TrainingPage() {
     user?.id, "Unable to load your training focus.", "Failed to load training focus:",
   );
   const focus = getTrainingFocusDisplay(athlete?.profile.training_focus);
+  const currentPower = athlete ? classifyTrainingFocus(athlete) : null;
   const focusTitle = isLoading ? "Loading…" : error ? "Focus unavailable" : focus.title;
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [availabilityOpen, setAvailabilityOpen] = useState(false);
+  const reference = new Date();
+  reference.setDate(reference.getDate() + weekOffset * 7);
+  const selectedWeek = weekKey(reference);
+  const availability = useTrainingAvailability(user?.id, selectedWeek);
+  const prescription = useMemo(() => prescribeWeek(athlete, availability.availability, new Date(`${selectedWeek}T12:00:00`)), [athlete, availability.availability, selectedWeek]);
   const week = useMemo(
-    () => buildWeeklyTrainingPlan(new Date(), CURRENT_WORKOUT_ASSIGNMENTS),
-    []
+    () => buildWeeklyTrainingPlan(new Date(`${selectedWeek}T12:00:00`), prescription.assignments),
+    [selectedWeek, prescription.assignments]
   );
-  const today = week.days.find((day) => day.isToday) ?? week.days[0];
+  const displayWeek = { ...week, days: week.days.map(day => ({ ...day, isToday: day.dateKey === toLocalDateKey(new Date()) })) };
+  const today = displayWeek.days.find((day) => day.isToday) ?? displayWeek.days[0];
   const [selectedDateKey, setSelectedDateKey] = useState(today.dateKey);
   const selectedDay =
-    week.days.find((day) => day.dateKey === selectedDateKey) ?? today;
+    displayWeek.days.find((day) => day.dateKey === selectedDateKey) ?? today;
 
   return (
     <View style={styles.page}>
@@ -78,9 +94,24 @@ export default function TrainingPage() {
           </View>
 
           <View style={styles.sectionHeader}>
+            <Pressable accessibilityRole="button" disabled={availability.saving} onPress={() => setWeekOffset(0)}><Text>This week</Text></Pressable>
+            <Pressable accessibilityRole="button" disabled={availability.saving} onPress={() => setWeekOffset(1)}><Text>Next week</Text></Pressable>
+            <Text>{selectedWeek}</Text>
+          </View>
+          {availability.loading ? <Text>Loading availability…</Text> : availability.error ? <View><Text accessibilityRole="alert">{availability.error}</Text><Pressable accessibilityRole="button" onPress={availability.reload}><Text>Retry availability</Text></Pressable></View> : athlete ? <Pressable accessibilityRole="button" onPress={() => setAvailabilityOpen(true)} style={styles.availabilityButton}>
+            <Text style={styles.dayTitle}>{availability.availability ? `${availability.availability.weekly_minutes / 60} h available · ${availability.availability.rest_days.length} preferred rest days` : "Set your weekly availability"}</Text>
+            <Text style={styles.dayDetail}>Edit availability →</Text>
+          </Pressable> : null}
+          <View style={styles.planningNote}><View style={styles.planningCopy}>
+            <Text style={styles.planningTitle}>Suggested stimulus</Text>
+            <Text style={styles.planningText}>{Math.round(prescription.totalMinutes)} min · {prescription.trainingDays} rides · {7 - prescription.trainingDays} rest days · {prescription.qualitySessions} focused sessions ({prescription.qualityMinutes} work min)</Text>
+            {prescription.messages.map(message => <Text key={message} style={styles.planningText}>{message}</Text>)}
+          </View></View>
+
+          <View style={styles.sectionHeader}>
             <View>
               <Text style={styles.sectionEyebrow}>CURRENT CALENDAR</Text>
-              <Text style={styles.sectionTitle}>This week</Text>
+              <Text style={styles.sectionTitle}>{weekOffset === 0 ? "This week" : "Next week"}</Text>
             </View>
             <Text style={styles.weekText}>
               {formatWeekRange(week.startDate, week.endDate)}
@@ -88,7 +119,7 @@ export default function TrainingPage() {
           </View>
 
           <View style={styles.week}>
-            {week.days.map((day) => (
+            {displayWeek.days.map((day) => (
               <Day
                 key={day.dateKey}
                 day={day}
@@ -109,15 +140,15 @@ export default function TrainingPage() {
             </View>
           </View>
 
-          <DailyPlan day={selectedDay} focusTitle={focusTitle} />
+          <DailyPlan day={selectedDay} focusTitle={focusTitle} cp={currentPower?.cpWatts ?? null} p5={currentPower?.fiveMinuteWatts ?? null} />
 
           <View style={styles.planningNote}>
             <View style={styles.planningMarker} />
             <View style={styles.planningCopy}>
               <Text style={styles.sectionEyebrow}>PRESCRIPTION FOUNDATION</Text>
-              <Text style={styles.planningTitle}>Focus will shape the week.</Text>
+              <Text style={styles.planningTitle}>Focus shapes the week.</Text>
               <Text style={styles.planningText}>
-                Your focus compares sustained power with five-minute power. It guides workout selection; your fitness level, recent training and recovery will determine the dose. It is reassessed when you update your maximal efforts.
+                Your focus compares sustained power with five-minute power. Your fitness level, recent volume and availability shape these suggestions. This is a regenerated planning view, not a log of completed workouts. Z2 targets remain zone-based; upper Z2 is not a measured LT1.
               </Text>
             </View>
           </View>
@@ -125,6 +156,20 @@ export default function TrainingPage() {
       </ScrollView>
 
       <BottomNav active="training" />
+      <Modal visible={availabilityOpen && !!athlete} transparent animationType="fade" onRequestClose={() => { if (!availability.saving) setAvailabilityOpen(false); }}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalBackdrop}>
+          <View accessibilityViewIsModal style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.dayTitle}>Availability · week of {selectedWeek}</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="Close availability without saving" disabled={availability.saving} onPress={() => setAvailabilityOpen(false)} style={styles.modalClose}><Text>Close</Text></Pressable>
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
+              {availabilityOpen && athlete ? <TrainingAvailabilityEditor key={`${user?.id}:${selectedWeek}`} athlete={athlete} value={availability.availability} week={selectedWeek} saving={availability.saving}
+                onSave={async value => { await availability.save(value); setAvailabilityOpen(false); }} /> : null}
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -174,7 +219,7 @@ function Day({
   );
 }
 
-function DailyPlan({ day, focusTitle }: { day: TrainingDayPlan; focusTitle: string }) {
+function DailyPlan({ day, focusTitle, cp, p5 }: { day: TrainingDayPlan; focusTitle: string; cp: number | null; p5: number | null }) {
   const workout = resolveDayWorkout(day);
   const isRestDay = day.workout == null;
 
@@ -189,12 +234,12 @@ function DailyPlan({ day, focusTitle }: { day: TrainingDayPlan; focusTitle: stri
         </View>
         <View style={styles.statusPill}>
           <Text style={styles.statusText}>
-            {isRestDay ? "NO WORKOUT ASSIGNED" : "ASSIGNED"}
+            {isRestDay ? "NO WORKOUT ASSIGNED" : "SUGGESTED"}
           </Text>
         </View>
       </View>
 
-      <Text style={styles.sessionDescription}>{workout.description}</Text>
+      {workout.workout ? <WorkoutDetails workout={workout.workout} cp={cp} p5={p5} /> : <Text style={styles.sessionDescription}>{workout.description}</Text>}
 
       <View style={styles.sessionMeta}>
         <Meta label="DATE" value={formatFullDate(day.date)} />
@@ -299,6 +344,11 @@ function formatDuration(minutes: number) {
 }
 
 const styles = StyleSheet.create({
+  availabilityButton: { padding: 16, borderRadius: 14, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", alignItems: "center", padding: 16 },
+  modalCard: { width: "100%", maxWidth: 640, maxHeight: "90%", backgroundColor: theme.colors.surface, borderRadius: 20, paddingHorizontal: 16 },
+  modalHeader: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", paddingTop: 12 },
+  modalClose: { padding: 14 },
   page: { flex: 1, backgroundColor: theme.colors.background },
   scrollContent: { paddingBottom: 140 },
   container: {

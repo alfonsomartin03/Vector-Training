@@ -9,16 +9,7 @@ type AuthGateProps = {
   children: ReactNode;
 };
 
-const PUBLIC_ROUTES = new Set([
-  "",
-  "about",
-  "how-it-works",
-  "login",
-  "privacy",
-  "register",
-  "science",
-  "terms",
-]);
+const PROTECTED_ROUTES = new Set(["admin", "dashboard", "power", "profile", "training"]);
 
 export function AuthGate({ children }: AuthGateProps) {
   const { session, loading } = useAuth();
@@ -31,13 +22,13 @@ export function AuthGate({ children }: AuthGateProps) {
 
     const currentRoute = segments[0] ?? "";
 
-    const isPublicRoute = PUBLIC_ROUTES.has(currentRoute);
+    const isProtectedRoute = PROTECTED_ROUTES.has(currentRoute);
 
     /*
      * User is NOT authenticated and attempts to access
      * a protected athlete route.
      */
-    if (!session && !isPublicRoute) {
+    if (!session && isProtectedRoute) {
       router.replace("/login");
       return;
     }

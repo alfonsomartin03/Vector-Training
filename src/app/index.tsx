@@ -576,6 +576,11 @@ export default function LandingPage() {
               title="Privacy"
               onPress={() => router.push("/privacy")}
             />
+
+            <NavLink
+              title="Terms"
+              onPress={() => router.push("/terms")}
+            />
           </View>
         </View>
       </View>

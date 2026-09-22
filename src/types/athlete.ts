@@ -61,4 +61,10 @@ export type AthleteData = {
   powerProfile: PowerProfile | null;
   vo2MaxTest: Vo2MaxTest | null;
   lactateTest: LactateTest | null;
+  /** Newest first. Used to derive progress against the previous valid point. */
+  powerHistory?: PowerProfile[];
+  /** Newest first. */
+  vo2MaxHistory?: Vo2MaxTest[];
+  /** Newest first. */
+  lactateHistory?: LactateTest[];
 };

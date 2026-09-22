@@ -64,7 +64,6 @@ export default function ProfilePage() {
     () => (athlete ? buildAthleteModel(athlete) : null),
     [athlete]
   );
-
   const firstName = profile?.first_name ?? "";
   const lastName = profile?.last_name ?? "";
 

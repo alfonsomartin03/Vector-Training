@@ -92,14 +92,44 @@ async function getAthleteDataOnce(
     .limit(1)
     .maybeSingle();
 
+  const powerHistoryRequest = supabase
+    .from("power_profiles")
+    .select("id, user_id, one_minute_watts, five_minute_watts, twelve_minute_watts, maximal_efforts_confirmed, recorded_at")
+    .eq("user_id", userId)
+    .order("recorded_at", { ascending: false, nullsFirst: false })
+    .order("id", { ascending: false })
+    .limit(25);
+
+  const vo2HistoryRequest = supabase
+    .from("vo2max_tests")
+    .select("id, user_id, relative_vo2max, absolute_vo2_l_min, body_mass_kg, vt1_power_watts, vt2_power_watts, max_aerobic_power_watts, test_date, source, created_at")
+    .eq("user_id", userId)
+    .order("test_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(25);
+
+  const lactateHistoryRequest = supabase
+    .from("lactate_tests")
+    .select("id, user_id, lt1_power_watts, lt1_heart_rate_bpm, lt1_lactate_mmol, lt2_power_watts, lt2_heart_rate_bpm, lt2_lactate_mmol, test_date, source, created_at")
+    .eq("user_id", userId)
+    .order("test_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(25);
+
   const [
     { data: powerProfile, error: powerProfileError },
     { data: vo2MaxTest, error: vo2MaxError },
     { data: lactateTest, error: lactateError },
+    { data: powerHistory, error: powerHistoryError },
+    { data: vo2MaxHistory, error: vo2HistoryError },
+    { data: lactateHistory, error: lactateHistoryError },
   ] = await Promise.all([
     powerProfileRequest,
     vo2MaxRequest,
     lactateRequest,
+    powerHistoryRequest,
+    vo2HistoryRequest,
+    lactateHistoryRequest,
   ]);
 
   if (profileError) {
@@ -122,11 +152,36 @@ async function getAthleteDataOnce(
     throw new Error(`Unable to load lactate data: ${lactateError.message}`);
   }
 
+  if (powerHistoryError) {
+    throw new Error(`Unable to load power progress: ${powerHistoryError.message}`);
+  }
+  if (vo2HistoryError && !isMissingRelationError(vo2HistoryError.code)) {
+    throw new Error(`Unable to load VO₂max progress: ${vo2HistoryError.message}`);
+  }
+  if (lactateHistoryError && !isMissingRelationError(lactateHistoryError.code)) {
+    throw new Error(`Unable to load lactate progress: ${lactateHistoryError.message}`);
+  }
+
   const athlete: AthleteData = {
     profile: profile as AthleteProfile,
     powerProfile: powerProfile as PowerProfile | null,
     vo2MaxTest: (vo2MaxTest as Vo2MaxTest | null) ?? null,
     lactateTest: (lactateTest as LactateTest | null) ?? null,
+    powerHistory: Array.isArray(powerHistory)
+      ? powerHistory as PowerProfile[]
+      : powerProfile
+        ? [powerProfile as PowerProfile]
+        : [],
+    vo2MaxHistory: Array.isArray(vo2MaxHistory)
+      ? vo2MaxHistory as Vo2MaxTest[]
+      : vo2MaxTest
+        ? [vo2MaxTest as Vo2MaxTest]
+        : [],
+    lactateHistory: Array.isArray(lactateHistory)
+      ? lactateHistory as LactateTest[]
+      : lactateTest
+        ? [lactateTest as LactateTest]
+        : [],
   };
   const focus = classifyTrainingFocus(athlete);
   if (athlete.profile.training_focus_revision == null) {

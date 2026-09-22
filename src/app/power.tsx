@@ -15,6 +15,7 @@ import {
   Vo2MaxModal,
 } from "../components/power/PowerDataModals";
 import { PowerDurationChart } from "../components/power/PowerDurationChart";
+import { MetricTrend } from "../components/MetricTrend";
 import { theme } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
 import { useAthleteData } from "../hooks/useAthleteData";
@@ -29,6 +30,7 @@ import {
   updatePowerProfile,
 } from "../lib/athlete";
 import { buildAthleteModel } from "../lib/physiology/athleteModel";
+import { buildAthleteProgress, type MetricTrend as MetricTrendValue } from "../lib/physiology/progress";
 import {
   buildCriticalPowerZones,
   type CriticalPowerZone,
@@ -54,6 +56,10 @@ export default function PowerPage() {
     () => (model ? buildCriticalPowerZones(model.cpWatts) : []),
     [model]
   );
+  const progress = useMemo(
+    () => (athlete ? buildAthleteProgress(athlete) : null),
+    [athlete]
+  );
   const profile = athlete?.profile;
   const powerProfile = athlete?.powerProfile ?? null;
   const vo2MaxTest = athlete?.vo2MaxTest ?? null;
@@ -76,6 +82,7 @@ export default function PowerPage() {
     setAthlete((current) =>
       current ? { ...current, vo2MaxTest: saved } : current
     );
+    await refreshAthlete();
   }
 
   async function handleLactateSave(values: LactateTestInput) {
@@ -84,6 +91,7 @@ export default function PowerPage() {
     setAthlete((current) =>
       current ? { ...current, lactateTest: saved } : current
     );
+    await refreshAthlete();
   }
 
   return (
@@ -126,12 +134,14 @@ export default function PowerPage() {
                 model ? `${(model.cpWatts / model.inputs.weightKg).toFixed(2)} W/kg` : "Needs 3 efforts"
               }
               source="Modeled"
+              trend={progress?.criticalPower ?? null}
             />
             <MetricCard
               label="W′"
               value={isLoading ? "..." : model ? `${model.wPrimeKj.toFixed(1)} kJ` : "—"}
               detail="Severe-domain capacity"
               source="Modeled"
+              trend={progress?.wPrime ?? null}
             />
             <MetricCard
               label="VO₂max"
@@ -139,6 +149,7 @@ export default function PowerPage() {
               detail="mL/kg/min"
               source={model?.vo2MaxSource === "measured" ? "Measured" : "Estimated"}
               emphasized={model?.vo2MaxSource === "measured"}
+              trend={progress?.vo2Max ?? null}
             />
             <MetricCard
               label="Lactate thresholds"
@@ -146,6 +157,7 @@ export default function PowerPage() {
               detail={lactateTest ? formatDate(lactateTest.test_date) : "No lab data"}
               source={lactateTest ? "Measured" : "Missing"}
               emphasized={Boolean(lactateTest)}
+              trend={progress?.lt2Power ?? progress?.lt1Power ?? null}
             />
           </View>
 
@@ -194,6 +206,7 @@ export default function PowerPage() {
                 <View style={styles.cpBadge}>
                   <Text style={styles.cpBadgeLabel}>CURRENT CP</Text>
                   <Text style={styles.cpBadgeValue}>{Math.round(model.cpWatts)} W</Text>
+                  <MetricTrend trend={progress?.criticalPower ?? null} compact />
                 </View>
               </View>
 
@@ -229,9 +242,9 @@ export default function PowerPage() {
                 <StatusPill label={powerProfile ? "Complete" : "Required"} active={Boolean(powerProfile)} />
               </View>
 
-              <DataRow label="1 minute" value={formatWatts(powerProfile?.one_minute_watts)} />
-              <DataRow label="5 minutes" value={formatWatts(powerProfile?.five_minute_watts)} />
-              <DataRow label="12 minutes" value={formatWatts(powerProfile?.twelve_minute_watts)} last />
+              <DataRow label="1 minute" value={formatWatts(powerProfile?.one_minute_watts)} trend={progress?.oneMinutePower ?? null} />
+              <DataRow label="5 minutes" value={formatWatts(powerProfile?.five_minute_watts)} trend={progress?.fiveMinutePower ?? null} />
+              <DataRow label="12 minutes" value={formatWatts(powerProfile?.twelve_minute_watts)} trend={progress?.twelveMinutePower ?? null} last />
 
               <ActionButton label="Edit power data" onPress={() => setEditor("power")} />
             </View>
@@ -259,6 +272,7 @@ export default function PowerPage() {
                   <Text style={styles.cardTitle}>
                     {vo2MaxTest ? `${model?.vo2Max.toFixed(1) ?? "—"} mL/kg/min` : "Add a measured value"}
                   </Text>
+                  {vo2MaxTest ? <MetricTrend trend={progress?.vo2Max ?? null} compact /> : null}
                 </View>
                 <StatusPill label={vo2MaxTest ? "Measured" : "Estimated"} active={Boolean(vo2MaxTest)} />
               </View>
@@ -267,10 +281,11 @@ export default function PowerPage() {
               </Text>
               {vo2MaxTest ? (
                 <View style={styles.dataBlock}>
-                  <DataRow label="Absolute VO₂" value={formatValue(vo2MaxTest.absolute_vo2_l_min, "L/min")} />
-                  <DataRow label="VT1 / VT2" value={formatPair(vo2MaxTest.vt1_power_watts, vo2MaxTest.vt2_power_watts, "W")} />
+                  <DataRow label="Absolute VO₂" value={formatValue(vo2MaxTest.absolute_vo2_l_min, "L/min")} trend={progress?.absoluteVo2 ?? null} />
+                  <DataRow label="VT1 power" value={formatValue(vo2MaxTest.vt1_power_watts, "W")} trend={progress?.vt1Power ?? null} />
+                  <DataRow label="VT2 power" value={formatValue(vo2MaxTest.vt2_power_watts, "W")} trend={progress?.vt2Power ?? null} />
                   <DataRow label="Body mass at test" value={formatValue(vo2MaxTest.body_mass_kg, "kg")} />
-                  <DataRow label="Maximum aerobic power" value={formatValue(vo2MaxTest.max_aerobic_power_watts, "W")} />
+                  <DataRow label="Maximum aerobic power" value={formatValue(vo2MaxTest.max_aerobic_power_watts, "W")} trend={progress?.maxAerobicPower ?? null} />
                   <DataRow label="Source" value={vo2MaxTest.source} />
                   <DataRow label="Test date" value={formatDate(vo2MaxTest.test_date)} last />
                 </View>
@@ -298,8 +313,8 @@ export default function PowerPage() {
               </Text>
               {lactateTest ? (
                 <View style={styles.dataBlock}>
-                  <DataRow label="LT1" value={formatLactatePoint(lactateTest, "lt1")} />
-                  <DataRow label="LT2" value={formatLactatePoint(lactateTest, "lt2")} />
+                  <DataRow label="LT1" value={formatLactatePoint(lactateTest, "lt1")} trend={progress?.lt1Power ?? null} />
+                  <DataRow label="LT2" value={formatLactatePoint(lactateTest, "lt2")} trend={progress?.lt2Power ?? null} />
                   <DataRow label="Source" value={lactateTest.source} />
                   <DataRow label="Test date" value={formatDate(lactateTest.test_date)} last />
                 </View>
@@ -363,12 +378,14 @@ function MetricCard({
   detail,
   source,
   emphasized,
+  trend,
 }: {
   label: string;
   value: string;
   detail: string;
   source: string;
   emphasized?: boolean;
+  trend: MetricTrendValue | null;
 }) {
   return (
     <View style={styles.metric}>
@@ -378,6 +395,7 @@ function MetricCard({
       </View>
       <Text style={styles.metricValue}>{value}</Text>
       <Text style={styles.metricDetail}>{detail}</Text>
+      {value !== "—" && value !== "..." ? <MetricTrend trend={trend} /> : null}
       <Text style={[styles.metricSource, emphasized ? styles.metricSourceActive : undefined]}>
         {source}
       </Text>
@@ -443,11 +461,14 @@ function SectionHeader({ eyebrow, title, aside }: { eyebrow: string; title: stri
   );
 }
 
-function DataRow({ label, value, last }: { label: string; value: string; last?: boolean }) {
+function DataRow({ label, value, trend, last }: { label: string; value: string; trend?: MetricTrendValue | null; last?: boolean }) {
   return (
     <View style={[styles.dataRow, last ? styles.dataRowLast : undefined]}>
       <Text style={styles.dataLabel}>{label}</Text>
-      <Text style={styles.dataValue} numberOfLines={2}>{value}</Text>
+      <View style={styles.dataValueGroup}>
+        <Text style={styles.dataValue} numberOfLines={2}>{value}</Text>
+        {trend !== undefined && value !== "—" ? <MetricTrend trend={trend} compact /> : null}
+      </View>
     </View>
   );
 }
@@ -552,15 +573,6 @@ function formatWatts(value: string | number | null | undefined) {
 
 function formatValue(value: string | number | null | undefined, unit: string) {
   return value == null ? "—" : `${value} ${unit}`;
-}
-
-function formatPair(
-  first: string | number | null | undefined,
-  second: string | number | null | undefined,
-  unit: string
-) {
-  if (first == null && second == null) return "—";
-  return `${first == null ? "—" : first} / ${second == null ? "—" : second} ${unit}`;
 }
 
 function formatThresholdSummary(test: LactateTest | null) {
@@ -799,7 +811,8 @@ const styles = StyleSheet.create({
   },
   dataRowLast: { borderBottomWidth: 0 },
   dataLabel: { color: theme.colors.textSecondary, fontSize: 12 },
-  dataValue: { flex: 1, color: theme.colors.text, fontSize: 12, fontWeight: "600", textAlign: "right" },
+  dataValueGroup: { flex: 1, alignItems: "flex-end" },
+  dataValue: { color: theme.colors.text, fontSize: 12, fontWeight: "600", textAlign: "right" },
   actionButton: {
     flexDirection: "row",
     alignItems: "center",

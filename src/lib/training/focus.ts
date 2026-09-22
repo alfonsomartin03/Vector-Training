@@ -8,7 +8,7 @@ export const FOCUS_POLICY = {
   version: 1,
   sustainableBelow: 0.75,
   ceilingAbove: 0.85,
-  maxTestAgeDays: 90,
+  maxTestAgeDays: 84,
 } as const;
 
 export const TRAINING_FOCUSES: Record<TrainingFocusTag, {
@@ -65,8 +65,8 @@ export function classifyTrainingFocus(
   if (!power?.maximal_efforts_confirmed) return result;
   const recorded = power.recorded_at ? Date.parse(power.recorded_at) : NaN;
   const age = (now.getTime() - recorded) / 86_400_000;
-  if (!Number.isFinite(age) || age < 0 || age > FOCUS_POLICY.maxTestAgeDays) {
-    return { ...result, reason: "Update your maximal power test: a dated test from the last 90 days is needed for a current focus." };
+  if (!Number.isFinite(age) || age < 0 || age >= FOCUS_POLICY.maxTestAgeDays) {
+    return { ...result, reason: "Update your maximal power test: a new supported maximum or a fresh test from the last 84 days is needed for a current focus." };
   }
   let cpWatts: number;
   const fiveMinuteWatts = Number(power.five_minute_watts);

@@ -62,13 +62,13 @@ every athlete into a claimed weakness. No extra physiological bucket is assigned
 when data are insufficient: the tag is null and status is `needs_data`.
 
 The policy requires confirmed maximal efforts, a valid Morton CP fit and a power
-test dated within 90 days. Unknown, future, stale or invalid inputs produce no tag.
-The 90-day window is also a product freshness rule, not a biological cutoff.
+test or supported activity maximum dated within 84 days. Unknown, future, stale or invalid inputs produce no tag.
+The 84-day window is also a product freshness rule, not a biological cutoff.
 Boundary comparisons use the full-precision ratio, not the rounded display value.
 
-Workout IDs express emphasis, not frequency, dosage or a generated weekly plan.
-Fitness level, training history, recent workload, available time, recovery and
-observed response should constrain a future prescription engine. In particular,
+Workout IDs express emphasis, while prescription policy version 2 controls frequency
+and dosage using fitness level, training history, recent workload, available time,
+recovery and recorded completion. In particular,
 the VO2 tag does not automatically prescribe the library's 5 × 5 at 120% CP.
 Evaluate changes in CP, five-minute power, measured VO2max where available,
 completion and perceived effort over time before claiming personalized efficacy.
@@ -91,7 +91,7 @@ update, retrying once if sources changed. This prevents an older computation fro
 overwriting newer power data. Equal assessments do not cause repeated writes.
 
 Missing migration or failed writes leave the focus unavailable with a visible
-message; the rest of the profile can still load. A test aging past 90 days is
+message; the rest of the profile can still load. A test aging to 84 days is
 reassessed on the next read (there is no background expiry job). External consumers
 must check `powerRecordedAt` and the policy version before using a cached tag.
 Measured VO2/lactate edits do not invalidate this version's tag, because they are

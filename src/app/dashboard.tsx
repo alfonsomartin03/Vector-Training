@@ -22,6 +22,7 @@ import {
 } from "../lib/physiology/progress";
 import { getTrainingFocusDisplay } from "../lib/training/focus";
 import { useTrainingAvailability } from "../hooks/useTrainingAvailability";
+import { useTrainingHistory } from "../hooks/useTrainingHistory";
 import { prescribeWeek, weekKey } from "../lib/training/prescription";
 import {
   buildWeeklyTrainingPlan,
@@ -51,11 +52,18 @@ export default function DashboardPage() {
   );
   const [selectedMetric, setSelectedMetric] = useState<DashboardMetric | null>(null);
   const availability = useTrainingAvailability(user?.id, weekKey());
-  const prescription = useMemo(() => prescribeWeek(athlete, availability.availability), [athlete, availability.availability]);
+  const trainingHistory = useTrainingHistory(user?.id);
+  const prescription = useMemo(() => prescribeWeek(
+    athlete,
+    availability.availability,
+    new Date(),
+    new Date(),
+    { completedWorkouts: trainingHistory.completedWorkouts, powerMaxima: trainingHistory.powerMaxima },
+  ), [athlete, availability.availability, trainingHistory.completedWorkouts, trainingHistory.powerMaxima]);
   const week = buildWeeklyTrainingPlan(new Date(), prescription.assignments);
   const today = week.days.find((day) => day.isToday) ?? week.days[0];
   const todayWorkout = resolveDayWorkout(today);
-  const focus = getTrainingFocusDisplay(athlete?.profile.training_focus);
+  const focus = getTrainingFocusDisplay(prescription.trainingFocus ?? athlete?.profile.training_focus);
   const firstName = athlete?.profile.first_name?.trim() || "Athlete";
   const firstInitial = firstName.charAt(0).toUpperCase();
 

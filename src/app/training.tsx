@@ -15,9 +15,10 @@ import {
 import { theme } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
 import { useAthleteData } from "../hooks/useAthleteData";
-import { classifyTrainingFocus, getTrainingFocusDisplay } from "../lib/training/focus";
+import { getTrainingFocusDisplay } from "../lib/training/focus";
 import { WorkoutDetails } from "../components/WorkoutDetails";
 import { useTrainingAvailability } from "../hooks/useTrainingAvailability";
+import { useTrainingHistory } from "../hooks/useTrainingHistory";
 import { TrainingAvailabilityEditor } from "../components/TrainingAvailabilityEditor";
 import { prescribeWeek, weekKey } from "../lib/training/prescription";
 import {
@@ -34,17 +35,24 @@ export default function TrainingPage() {
   const { athlete, isLoading, error } = useAthleteData(
     user?.id, "Unable to load your training focus.", "Failed to load training focus:",
   );
-  const focus = getTrainingFocusDisplay(athlete?.profile.training_focus);
-  const currentPower = athlete ? classifyTrainingFocus(athlete) : null;
-  const focusTitle = isLoading ? "Loading…" : error ? "Focus unavailable" : focus.title;
   const [weekOffset, setWeekOffset] = useState(0);
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
   const [dailyPlanOpen, setDailyPlanOpen] = useState(false);
+  const [completionError, setCompletionError] = useState<string | null>(null);
   const reference = new Date();
   reference.setDate(reference.getDate() + weekOffset * 7);
   const selectedWeek = weekKey(reference);
   const availability = useTrainingAvailability(user?.id, selectedWeek);
-  const prescription = useMemo(() => prescribeWeek(athlete, availability.availability, new Date(`${selectedWeek}T12:00:00`)), [athlete, availability.availability, selectedWeek]);
+  const history = useTrainingHistory(user?.id);
+  const prescription = useMemo(() => prescribeWeek(
+    athlete,
+    availability.availability,
+    new Date(`${selectedWeek}T12:00:00`),
+    new Date(),
+    { completedWorkouts: history.completedWorkouts, powerMaxima: history.powerMaxima },
+  ), [athlete, availability.availability, history.completedWorkouts, history.powerMaxima, selectedWeek]);
+  const focus = getTrainingFocusDisplay(prescription.trainingFocus ?? athlete?.profile.training_focus);
+  const focusTitle = isLoading ? "Loading…" : error ? "Focus unavailable" : focus.title;
   const week = useMemo(
     () => buildWeeklyTrainingPlan(new Date(`${selectedWeek}T12:00:00`), prescription.assignments),
     [selectedWeek, prescription.assignments]
@@ -54,6 +62,7 @@ export default function TrainingPage() {
   const [selectedDateKey, setSelectedDateKey] = useState(today.dateKey);
   const selectedDay =
     displayWeek.days.find((day) => day.dateKey === selectedDateKey) ?? today;
+  const selectedCompletion = history.completedWorkouts.find(item => item.scheduled_date === selectedDay.dateKey) ?? null;
 
   return (
     <View style={styles.page}>
@@ -125,9 +134,21 @@ export default function TrainingPage() {
               <OverviewStat
                 label="PLANNED LOAD"
                 value={`${Math.round(prescription.totalMinutes)} min · ${prescription.trainingDays} rides`}
-                detail={`${prescription.qualitySessions} focused sessions · ${prescription.qualityMinutes} work min`}
+                detail={prescription.recoveryWeek ? "Recovery week · endurance only" : `${prescription.qualitySessions} focused sessions · ${prescription.qualityMinutes} work min`}
               />
             </View>
+
+            {prescription.needsRetest ? (
+              <View accessibilityRole="alert" style={styles.retestCard}>
+                <View style={styles.retestCopy}>
+                  <Text style={styles.retestTitle}>Power retest due</Text>
+                  <Text style={styles.retestText}>It has been 84 days without a new supported power maximum. Focused progression is paused until your 1-, 5-, and 12-minute values are refreshed.</Text>
+                </View>
+                <Pressable accessibilityRole="button" onPress={() => router.push("/power")} style={styles.retestAction}>
+                  <Text style={styles.retestActionText}>Update power data →</Text>
+                </Pressable>
+              </View>
+            ) : null}
 
             {prescription.messages.length ? (
               <View style={styles.overviewMessages}>
@@ -136,6 +157,7 @@ export default function TrainingPage() {
                 ))}
               </View>
             ) : null}
+            {history.error ? <Text accessibilityRole="alert" style={styles.overviewMessage}>• {history.error}</Text> : null}
 
             {availability.error ? (
               <Pressable accessibilityRole="button" onPress={availability.reload} style={styles.overviewAction}>
@@ -176,7 +198,7 @@ export default function TrainingPage() {
               <Text style={styles.sectionEyebrow}>PRESCRIPTION FOUNDATION</Text>
               <Text style={styles.planningTitle}>Focus shapes the week.</Text>
               <Text style={styles.planningText}>
-                Your focus compares sustained power with five-minute power. Your fitness level, recent volume and availability shape these suggestions. This is a regenerated planning view, not a log of completed workouts. Z2 targets remain zone-based; upper Z2 is not a measured LT1.
+                The planner targets the gap between sustained and five-minute power, then adjusts each workout from completed sessions. Successful work progresses gradually; difficult sessions hold or reduce the next dose, and recovery weeks follow sustained loading. New supported activity maxima refresh the model automatically; otherwise a retest is requested after 84 days.
               </Text>
             </View>
           </View>
@@ -218,7 +240,21 @@ export default function TrainingPage() {
               </Pressable>
             </View>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.workoutModalContent}>
-              <DailyPlan day={selectedDay} focusTitle={focusTitle} cp={currentPower?.cpWatts ?? null} p5={currentPower?.fiveMinuteWatts ?? null} />
+              <DailyPlan
+                day={selectedDay}
+                focusTitle={focusTitle}
+                cp={prescription.trainingFocus?.cpWatts ?? null}
+                p5={prescription.trainingFocus?.fiveMinuteWatts ?? null}
+                completed={Boolean(selectedCompletion)}
+                saving={history.savingDate === selectedDay.dateKey}
+                completionError={completionError}
+                onComplete={async () => {
+                  if (!selectedDay.workout) return;
+                  setCompletionError(null);
+                  try { await history.markCompleted(selectedDay.dateKey, selectedDay.workout); }
+                  catch (error) { setCompletionError(error instanceof Error ? error.message : "Unable to record workout."); }
+                }}
+              />
             </ScrollView>
           </View>
         </View>
@@ -282,7 +318,16 @@ function Day({
   );
 }
 
-function DailyPlan({ day, focusTitle, cp, p5 }: { day: TrainingDayPlan; focusTitle: string; cp: number | null; p5: number | null }) {
+function DailyPlan({ day, focusTitle, cp, p5, completed, saving, completionError, onComplete }: {
+  day: TrainingDayPlan;
+  focusTitle: string;
+  cp: number | null;
+  p5: number | null;
+  completed: boolean;
+  saving: boolean;
+  completionError: string | null;
+  onComplete: () => Promise<void>;
+}) {
   const workout = resolveDayWorkout(day);
   const isRestDay = day.workout == null;
 
@@ -297,7 +342,7 @@ function DailyPlan({ day, focusTitle, cp, p5 }: { day: TrainingDayPlan; focusTit
         </View>
         <View style={styles.statusPill}>
           <Text style={styles.statusText}>
-            {isRestDay ? "NO WORKOUT ASSIGNED" : "SUGGESTED"}
+            {isRestDay ? "NO WORKOUT ASSIGNED" : completed ? "COMPLETED" : "SUGGESTED"}
           </Text>
         </View>
       </View>
@@ -315,7 +360,19 @@ function DailyPlan({ day, focusTitle, cp, p5 }: { day: TrainingDayPlan; focusTit
               : formatDuration(workout.durationMinutes)
           }
         />
+        {!isRestDay && workout.selectionReason ? <Meta label="PROGRESSION" value={workout.selectionReason} /> : null}
       </View>
+      {!isRestDay ? (
+        <Pressable
+          accessibilityRole="button"
+          disabled={completed || saving}
+          onPress={onComplete}
+          style={({ pressed }) => [styles.completionButton, completed ? styles.completionButtonDone : undefined, pressed ? styles.pressed : undefined]}
+        >
+          <Text style={styles.completionButtonText}>{completed ? "Workout completed" : saving ? "Saving…" : "Mark workout completed"}</Text>
+        </Pressable>
+      ) : null}
+      {completionError ? <Text accessibilityRole="alert" style={styles.completionError}>{completionError}</Text> : null}
     </View>
   );
 }
@@ -528,6 +585,23 @@ const styles = StyleSheet.create({
   overviewLabel: { color: theme.colors.accent, fontSize: 8, fontWeight: "800", letterSpacing: 1 },
   overviewValue: { color: theme.colors.text, fontSize: 16, fontWeight: "700", marginTop: 7 },
   overviewDetail: { color: theme.colors.textSecondary, fontSize: 11, lineHeight: 17, marginTop: 5 },
+  retestCard: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 14,
+    marginTop: 14,
+    padding: 15,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: "#E7B7A8",
+    backgroundColor: "#FFF4F0",
+  },
+  retestCopy: { flex: 1, minWidth: 240 },
+  retestTitle: { color: "#8B3E2F", fontSize: 13, fontWeight: "800" },
+  retestText: { color: "#7A5148", fontSize: 11, lineHeight: 17, marginTop: 4 },
+  retestAction: { minHeight: 40, justifyContent: "center", paddingHorizontal: 13, borderRadius: 9, backgroundColor: theme.colors.surface },
+  retestActionText: { color: "#8B3E2F", fontSize: 11, fontWeight: "700" },
   overviewMessages: { gap: 4, marginTop: 12 },
   overviewMessage: { color: theme.colors.textSecondary, fontSize: 11, lineHeight: 17 },
   overviewAction: {
@@ -655,6 +729,18 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
   },
+  completionButton: {
+    alignSelf: "flex-start",
+    minHeight: 44,
+    justifyContent: "center",
+    marginTop: 20,
+    paddingHorizontal: 17,
+    borderRadius: 11,
+    backgroundColor: theme.colors.text,
+  },
+  completionButtonDone: { backgroundColor: theme.colors.accent },
+  completionButtonText: { color: theme.colors.white, fontSize: 12, fontWeight: "700" },
+  completionError: { color: "#A33A3A", fontSize: 12, marginTop: 10 },
   metaLabel: {
     color: theme.colors.textSecondary,
     fontSize: 8,

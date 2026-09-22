@@ -66,8 +66,8 @@ test("freshness boundaries, absent dates and future dates", () => {
   for (const [recorded, status] of [
     [null, "needs_data"], ["invalid", "needs_data"],
     ["2026-09-22T00:00:00Z", "needs_data"],
-    [new Date(now.getTime() - 90 * 86400000).toISOString(), "provisional"],
-    [new Date(now.getTime() - 90 * 86400000 - 1).toISOString(), "needs_data"],
+    [new Date(now.getTime() - 84 * 86400000 + 1).toISOString(), "provisional"],
+    [new Date(now.getTime() - 84 * 86400000).toISOString(), "needs_data"],
   ]) {
     const data = athlete();
     data.powerProfile.recorded_at = recorded;

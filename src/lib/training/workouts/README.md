@@ -39,12 +39,12 @@ the five-minute set recovery replaces the normal repetition recovery. Microinter
 retain the last 15-second off phase of each set and add the set recovery after it.
 All interval templates support both repetitions per set and set count.
 
-## Future rider tailoring
+## Rider tailoring
 
-The defaults describe the requested library sessions; they are not automatic
-prescriptions for every fitness level. A future prescription layer should select
-the template, repetition/set count, power targets, and workload limits using the
-rider's data and available time. Structural validation enforces positive integer
+The defaults describe the library sessions; they are not automatic prescriptions
+for every fitness level. Prescription policy version 2 selects the template,
+repetition/set count, power targets, and workload limits from the rider's current
+power evidence, completed workouts, recovery cycle, and available time. Structural validation enforces positive integer
 counts and endurance increments; the 1,000-repetition cap is a resource guard,
 not a training recommendation.
 
@@ -55,11 +55,10 @@ target; it does not claim that this is the rider's measured LT1. Five-minute max
 means five-minute power, not VO2max in mL/kg/min. Define how to select a point or
 range within Z2 when implementing watt resolution.
 
-Persist the eventual resolved prescription in Supabase with its parameters,
-template version, resolved steps, relevant athlete inputs, and selection reason.
-Existing prescriptions should not silently change when a template or athlete model
-changes. Increment template versions when changing their meaning or defaults.
-The builder currently returns a serializable structural session, not a resolved
-watt prescription, and does not assign it to the calendar.
+Completed prescriptions are persisted with their prescription/template versions,
+parameters, progression level, planned dose, completion, and selection reason so
+future policy changes remain interpretable. The builder still returns a serializable
+structural session; the prescription layer resolves rider context and assigns it to
+the calendar.
 
 Run `npm run test:workouts`, `npm run typecheck`, and `npm run lint` for validation.

@@ -6,6 +6,10 @@ export type WorkoutAssignment = {
   description: string;
   focusId: string;
   durationMinutes: number | null;
+  progressionLevel?: number;
+  prescriptionVersion?: number;
+  recoveryWeek?: boolean;
+  selectionReason?: string;
 };
 
 export type TrainingDayPlan = {

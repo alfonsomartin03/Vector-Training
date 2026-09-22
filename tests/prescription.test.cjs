@@ -10,10 +10,26 @@ execFileSync(process.execPath, [require.resolve("typescript/bin/tsc"), "src/lib/
 const { prescribeWeek, availabilityForWeek, validateAvailability, weekKey, recommendAvailability } = require(path.join(output, "lib/training/prescription.js"));
 const now = new Date();
 const week = weekKey(now);
+const weekStart = new Date(`${week}T12:00:00`);
 const base = { week_start: week, weekly_minutes: 480, recent_weekly_minutes: 480, max_session_minutes: 150, rest_days: [0, 2], recovery_week: false };
 function athlete(ratio = 0.8, experience = "advanced", weight = 70) {
   const cp = 400 * ratio, wPrime = (400 - cp) * 420;
   return { profile: { id: "one", weight_kg: weight, training_history: experience }, powerProfile: { user_id: "one", maximal_efforts_confirmed: true, recorded_at: new Date(now.getTime() - 86400000).toISOString(), one_minute_watts: cp + wPrime / 180, five_minute_watts: 400, twelve_minute_watts: cp + wPrime / 840 }, vo2MaxTest: null, lactateTest: null };
+}
+function priorDate(weeksAgo, day = 1) {
+  const date = new Date(weekStart);
+  date.setDate(date.getDate() - weeksAgo * 7 + day);
+  return date;
+}
+function completion(templateId, weeksAgo, changes = {}) {
+  const date = priorDate(weeksAgo);
+  return {
+    scheduled_date: date.toISOString().slice(0, 10), template_id: templateId, focus_id: "balanced",
+    progression_level: 0, prescription_version: 2, planned_duration_minutes: 90,
+    planned_work_minutes: 20, completed_duration_minutes: 90, completion_ratio: 1,
+    perceived_exertion: 7, recovery_week: false, parameters: {}, completed_at: date.toISOString(),
+    ...changes,
+  };
 }
 test("availability validates dates, finite bounds, distinct rest days and boolean recovery", () => {
   assert.equal(validateAvailability(base), null);
@@ -47,7 +63,56 @@ test("experience and fitness limit the interval dose; unknown recent volume is e
 });
 test("future planning rechecks test freshness at the planned date", () => {
   const future = new Date(now.getTime() + 100 * 86400000);
-  assert.equal(prescribeWeek(athlete(), base, future, now).qualitySessions, 0);
+  const plan = prescribeWeek(athlete(), base, future, now);
+  assert.equal(plan.qualitySessions, 0);
+  assert.equal(plan.needsRetest, true);
+});
+test("a supported activity maximum refreshes the 84-day clock and the effective model", () => {
+  const stale = athlete();
+  stale.powerProfile.recorded_at = new Date(now.getTime() - 84 * 86400000).toISOString();
+  const stalePlan = prescribeWeek(stale, base, now, now);
+  assert.equal(stalePlan.needsRetest, true);
+  assert.equal(stalePlan.qualitySessions, 0);
+  const nonMaximum = prescribeWeek(stale, base, now, now, { powerMaxima: [{ duration_seconds: 300, watts: 390, observed_at: new Date(now.getTime() - 86400000).toISOString(), source: "activity" }] });
+  assert.equal(nonMaximum.needsRetest, true);
+  const refreshed = prescribeWeek(stale, base, now, now, { powerMaxima: [{ duration_seconds: 300, watts: 410, observed_at: new Date(now.getTime() - 86400000).toISOString(), source: "activity" }] });
+  assert.equal(refreshed.needsRetest, false);
+  assert.ok(refreshed.qualitySessions >= 1);
+  assert.equal(refreshed.trainingFocus.fiveMinuteWatts, 410);
+});
+test("successful completion progresses the same workout while difficult completion reduces it", () => {
+  const initial = prescribeWeek(athlete(), base, now);
+  const assignment = Object.values(initial.assignments).find(item => item.workout.templateId !== "endurance");
+  assert.ok(assignment);
+  const success = completion(assignment.workout.templateId, 1, { progression_level: assignment.progressionLevel });
+  const progressed = prescribeWeek(athlete(), base, now, now, { completedWorkouts: [success] });
+  const progressedMatch = Object.values(progressed.assignments).find(item => item.workout.templateId === assignment.workout.templateId);
+  assert.ok(progressedMatch);
+  assert.ok(progressedMatch.progressionLevel >= assignment.progressionLevel);
+  assert.match(progressedMatch.selectionReason, /Progressed|Initial/);
+  const hard = { ...success, progression_level: 2, completion_ratio: 0.5, perceived_exertion: 10 };
+  const reduced = prescribeWeek(athlete(), base, now, now, { completedWorkouts: [hard] });
+  const reducedMatch = Object.values(reduced.assignments).find(item => item.workout.templateId === assignment.workout.templateId);
+  assert.ok(reducedMatch.progressionLevel < 2);
+});
+test("three consecutive loading weeks schedule an automatic recovery week", () => {
+  const history = [completion("endurance", 1), completion("endurance", 2), completion("endurance", 3)];
+  const plan = prescribeWeek(athlete(), base, now, now, { completedWorkouts: history });
+  assert.equal(plan.recoveryWeek, true);
+  assert.equal(plan.recoveryReason, "scheduled");
+  assert.equal(plan.qualitySessions, 0);
+  assert.ok(plan.totalMinutes <= base.recent_weekly_minutes * 0.6);
+});
+test("a representative completed week permits no more than five percent volume progression", () => {
+  const availability = { ...base, weekly_minutes: 600 };
+  const history = [
+    completion("endurance", 1, { scheduled_date: priorDate(1, 1).toISOString().slice(0, 10), planned_duration_minutes: 250, completed_duration_minutes: 250 }),
+    completion("endurance", 1, { scheduled_date: priorDate(1, 4).toISOString().slice(0, 10), planned_duration_minutes: 250, completed_duration_minutes: 250 }),
+  ];
+  const baseline = prescribeWeek(athlete(), availability, now);
+  const progressed = prescribeWeek(athlete(), availability, now, now, { completedWorkouts: history });
+  assert.ok(progressed.totalMinutes > baseline.totalMinutes);
+  assert.ok(progressed.totalMinutes <= 525);
 });
 test("focus changes selection, all intervals retain warmup/cooldown, VO2 is P5-capped", () => {
   for (const ratio of [0.7, 0.8, 0.9]) {
@@ -73,12 +138,14 @@ test("budget/rest/session/intensity invariants hold across all rest patterns and
     assert.ok(plan.totalMinutes <= minutes && plan.totalMinutes <= settings.recent_weekly_minutes);
     assert.ok(plan.trainingDays <= 6);
     assert.ok(plan.qualityMinutes <= plan.totalMinutes * 0.2 + 1e-8);
+    const qualityDays = [];
     for (const [date, a] of Object.entries(plan.assignments)) {
       const day = (new Date(`${date}T12:00:00`).getDay() + 6) % 7;
       assert.ok(!rest_days.includes(day));
       assert.ok(a.durationMinutes <= settings.max_session_minutes);
-      if (a.workout.templateId !== "endurance") assert.ok([1,4].includes(day));
+      if (a.workout.templateId !== "endurance") qualityDays.push(day);
     }
+    if (qualityDays.length > 1) assert.ok(Math.abs(qualityDays[0] - qualityDays[1]) >= 2);
   }
 });
 test("deterministic and does not mutate availability or athlete inputs", () => {

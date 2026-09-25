@@ -137,14 +137,21 @@ export default function PowerPage() {
             </Pressable>
           </View>
 
-          <View style={styles.hero}>
-            <Text style={styles.eyebrow}>POWER &amp; PHYSIOLOGY</Text>
-            <Text style={[styles.title, compact ? styles.titleCompact : undefined]}>
-              Your performance model.
-            </Text>
-            <Text style={styles.subtitle}>
-              Measured data where you have it. Transparent estimates where you don’t.
-            </Text>
+          <View style={[styles.hero, compact ? styles.heroCompact : undefined]}>
+            <View style={styles.heroCopy}>
+              <Text style={styles.eyebrow}>POWER &amp; PHYSIOLOGY</Text>
+              <Text style={[styles.title, compact ? styles.titleCompact : undefined]}>
+                Your performance, decoded.
+              </Text>
+              <Text style={styles.subtitle}>
+                One clear model for your power, capacity, and training intensity.
+              </Text>
+            </View>
+            <Pressable accessibilityRole="button" onPress={() => setEditor("power")} style={styles.heroAction}>
+              <Text style={styles.heroActionLabel}>LATEST TEST</Text>
+              <Text style={styles.heroActionValue}>{formatDate(powerProfile?.recorded_at)}</Text>
+              <Text style={styles.heroActionText}>{powerProfile ? "Update power data  ↗" : "Add power data  ↗"}</Text>
+            </Pressable>
           </View>
 
           {error ? (
@@ -161,6 +168,7 @@ export default function PowerPage() {
                 model ? `${(model.cpWatts / model.inputs.weightKg).toFixed(2)} W/kg` : "Needs 3 efforts"
               }
               source="Modeled"
+              featured
               trend={progress?.criticalPower ?? null}
               onPress={() => setSelectedMetric("criticalPower")}
             />
@@ -458,6 +466,7 @@ function MetricCard({
   detail,
   source,
   emphasized,
+  featured,
   trend,
   onPress,
 }: {
@@ -466,6 +475,7 @@ function MetricCard({
   detail: string;
   source: string;
   emphasized?: boolean;
+  featured?: boolean;
   trend: MetricTrendValue | null;
   onPress: () => void;
 }) {
@@ -474,16 +484,16 @@ function MetricCard({
       accessibilityLabel={`View ${label} trend`}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.metric, pressed ? styles.pressed : undefined]}
+      style={({ pressed }) => [styles.metric, featured ? styles.metricFeatured : undefined, pressed ? styles.pressed : undefined]}
     >
       <View style={styles.metricTop}>
-        <Text style={styles.metricLabel}>{label}</Text>
-        <View style={[styles.sourceDot, emphasized ? styles.sourceDotActive : undefined]} />
+        <Text style={[styles.metricLabel, featured ? styles.metricLabelFeatured : undefined]}>{label}</Text>
+        <View style={[styles.sourceDot, emphasized || featured ? styles.sourceDotActive : undefined]} />
       </View>
-      <Text style={styles.metricValue}>{value}</Text>
-      <Text style={styles.metricDetail}>{detail}</Text>
+      <Text style={[styles.metricValue, featured ? styles.metricValueFeatured : undefined]}>{value}</Text>
+      <Text style={[styles.metricDetail, featured ? styles.metricDetailFeatured : undefined]}>{detail}</Text>
       {value !== "—" && value !== "..." ? <MetricTrend trend={trend} /> : null}
-      <Text style={[styles.metricSource, emphasized ? styles.metricSourceActive : undefined]}>
+      <Text style={[styles.metricSource, emphasized ? styles.metricSourceActive : undefined, featured ? styles.metricSourceFeatured : undefined]}>
         {source}
       </Text>
     </Pressable>
@@ -665,9 +675,9 @@ function formatDate(value: string | null | undefined) {
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: theme.colors.background },
   scrollContent: { paddingBottom: 140 },
-  container: { width: "100%", maxWidth: 1080, alignSelf: "center", paddingHorizontal: 24 },
+  container: { width: "100%", maxWidth: 1120, alignSelf: "center", paddingHorizontal: 24 },
   header: {
-    height: 90,
+    height: 82,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -677,18 +687,25 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.glass,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: theme.colors.glassBorder,
     alignItems: "center",
     justifyContent: "center",
+    boxShadow: theme.shadows.soft,
   },
   avatarText: { color: theme.colors.text, fontWeight: "700" },
-  hero: { paddingTop: 42, paddingBottom: 45 },
+  hero: { paddingTop: 42, paddingBottom: 38, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 28 },
+  heroCompact: { alignItems: "flex-start", flexWrap: "wrap" },
+  heroCopy: { flex: 1, maxWidth: 720 },
   eyebrow: { color: theme.colors.accent, fontSize: 10, fontWeight: "800", letterSpacing: 1.5 },
   title: { color: theme.colors.text, fontSize: 42, fontWeight: "700", letterSpacing: -1.6, marginTop: 10 },
   titleCompact: { fontSize: 34 },
   subtitle: { color: theme.colors.textSecondary, fontSize: 16, lineHeight: 24, marginTop: 10 },
+  heroAction: { minWidth: 210, padding: 17, borderRadius: 20, backgroundColor: theme.colors.glass, borderWidth: 1, borderColor: theme.colors.glassBorder, boxShadow: theme.shadows.soft },
+  heroActionLabel: { color: theme.colors.accent, fontSize: 8, fontWeight: "800", letterSpacing: 1.1 },
+  heroActionValue: { color: theme.colors.text, fontSize: 15, fontWeight: "700", marginTop: 7 },
+  heroActionText: { color: theme.colors.textSecondary, fontSize: 10, fontWeight: "600", marginTop: 5 },
   errorCard: { padding: 14, borderRadius: 12, backgroundColor: "#FFF0F0", marginBottom: 18 },
   errorText: { color: "#A33A3A", fontSize: 13 },
   metrics: { flexDirection: "row", gap: 12 },
@@ -698,11 +715,17 @@ const styles = StyleSheet.create({
     minWidth: 0,
     minHeight: 155,
     padding: 18,
-    borderRadius: 16,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.glassBorder,
+    backgroundColor: theme.colors.glass,
+    boxShadow: theme.shadows.insetLike,
   },
+  metricFeatured: { backgroundColor: theme.colors.darkSurface, borderColor: theme.colors.darkSurface, boxShadow: theme.shadows.raised },
+  metricLabelFeatured: { color: "#A9D8CC" },
+  metricValueFeatured: { color: theme.colors.white },
+  metricDetailFeatured: { color: "rgba(255,255,255,0.62)" },
+  metricSourceFeatured: { color: "#A9D8CC" },
   metricTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   metricLabel: { color: theme.colors.textSecondary, fontSize: 11, fontWeight: "600" },
   sourceDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: theme.colors.border },
@@ -724,10 +747,11 @@ const styles = StyleSheet.create({
   sectionAside: { color: theme.colors.textSecondary, fontSize: 11, textAlign: "right" },
   chartCard: {
     padding: 24,
-    borderRadius: 20,
+    borderRadius: 26,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.glassBorder,
+    backgroundColor: theme.colors.glass,
+    boxShadow: theme.shadows.soft,
   },
   chartFooter: {
     flexDirection: "row",
@@ -742,10 +766,11 @@ const styles = StyleSheet.create({
   metaValue: { color: theme.colors.text, fontSize: 11, fontWeight: "600", marginTop: 4 },
   zonesCard: {
     padding: 24,
-    borderRadius: 20,
+    borderRadius: 26,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.glassBorder,
+    backgroundColor: theme.colors.glass,
+    boxShadow: theme.shadows.soft,
   },
   zonesIntro: {
     flexDirection: "row",
@@ -841,16 +866,18 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     padding: 22,
-    borderRadius: 18,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.glassBorder,
+    backgroundColor: theme.colors.glass,
+    boxShadow: theme.shadows.soft,
   },
   protocolCard: {
     flex: 1.25,
     padding: 22,
-    borderRadius: 18,
-    backgroundColor: "#111315",
+    borderRadius: 22,
+    backgroundColor: theme.colors.darkSurface,
+    boxShadow: theme.shadows.raised,
   },
   cardHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
   cardHeaderCopy: { flex: 1 },
@@ -897,10 +924,11 @@ const styles = StyleSheet.create({
   labCard: {
     flex: 1,
     padding: 22,
-    borderRadius: 18,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.glassBorder,
+    backgroundColor: theme.colors.glass,
+    boxShadow: theme.shadows.soft,
   },
   emptyCopy: { color: theme.colors.textSecondary, fontSize: 12, lineHeight: 19, marginTop: 20 },
   emptyState: { minHeight: 270, alignItems: "center", justifyContent: "center", padding: 24 },

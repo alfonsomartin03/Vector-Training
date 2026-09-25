@@ -67,6 +67,9 @@ export default function DashboardPage() {
   const focus = getTrainingFocusDisplay(prescription.trainingFocus ?? athlete?.profile.training_focus);
   const firstName = athlete?.profile.first_name?.trim() || "Athlete";
   const firstInitial = firstName.charAt(0).toUpperCase();
+  const completedThisWeek = week.days.filter(day =>
+    trainingHistory.completedWorkouts.some(item => item.scheduled_date === day.dateKey)
+  ).length;
 
   return (
     <View style={styles.page}>
@@ -87,9 +90,9 @@ export default function DashboardPage() {
           <View style={styles.hero}>
             <Text style={styles.heroEyebrow}>{getGreeting()}</Text>
             <Text style={[styles.heroTitle, compact ? styles.heroTitleCompact : undefined]}>
-              Welcome back, {firstName}.
+              Ready for what’s next, {firstName}?
             </Text>
-            <Text style={styles.heroSubtitle}>Your physiology and training at a glance.</Text>
+            <Text style={styles.heroSubtitle}>{formatFullDate(today.date)} · Your training and physiology, distilled.</Text>
           </View>
 
           {error ? (
@@ -98,6 +101,53 @@ export default function DashboardPage() {
             </View>
           ) : null}
           {availability.error ? <Text accessibilityRole="alert">{availability.error}</Text> : !availability.loading && !availability.availability ? <Pressable onPress={() => router.push("/training")}><Text>Set your weekly availability on Training to generate a plan →</Text></Pressable> : null}
+
+          <View style={[styles.dashboardLead, compact ? styles.stack : undefined]}>
+            <Pressable
+              onPress={() => router.push("/training")}
+              style={({ pressed }) => [styles.workoutCard, pressed ? styles.pressed : undefined]}
+            >
+              <View style={styles.workoutCardGlow} />
+              <View style={styles.workoutTopline}>
+                <View>
+                  <Text style={styles.workoutEyebrow}>TODAY · {todayWorkout.detail.toUpperCase()}</Text>
+                  <Text style={styles.workoutDate}>{formatFullDate(today.date)}</Text>
+                </View>
+                <View style={styles.workoutIcon}><Text style={styles.workoutIconText}>⌁</Text></View>
+              </View>
+              <Text style={styles.workoutTitle}>{todayWorkout.title}</Text>
+              <Text style={styles.workoutDescription} numberOfLines={3}>{todayWorkout.description}</Text>
+              <View style={styles.workoutActionRow}>
+                <Text style={styles.workoutStatus}>{today.workout ? "Planned for today" : "Recovery day"}</Text>
+                <Text style={styles.workoutAction}>Open workout  ↗</Text>
+              </View>
+            </Pressable>
+
+            <View style={styles.weekCard}>
+              <View style={styles.weekCardHeader}>
+                <View>
+                  <Text style={styles.sectionEyebrow}>THIS WEEK</Text>
+                  <Text style={styles.weekCardTitle}>Your rhythm</Text>
+                </View>
+                <Text style={styles.weekRange}>{formatWeekRange(week.startDate, week.endDate)}</Text>
+              </View>
+              <View style={styles.weekStats}>
+                <DashboardStat value={`${prescription.trainingDays}`} label="rides" />
+                <DashboardStat value={`${completedThisWeek}`} label="complete" />
+                <DashboardStat value={(prescription.totalMinutes / 60).toFixed(1)} label="hours" />
+              </View>
+              <View style={styles.weekFocus}>
+                <View style={styles.weekFocusMark}><Text style={styles.weekFocusMarkText}>✦</Text></View>
+                <View style={styles.weekFocusCopy}>
+                  <Text style={styles.weekFocusLabel}>CURRENT FOCUS</Text>
+                  <Text style={styles.weekFocusValue}>{isLoading ? "Loading…" : focus.title}</Text>
+                </View>
+              </View>
+              <Pressable onPress={() => router.push("/training")} style={styles.weekLink}>
+                <Text style={styles.weekLinkText}>View training calendar</Text><Text style={styles.weekLinkArrow}>→</Text>
+              </Pressable>
+            </View>
+          </View>
 
           <SectionHeader
             eyebrow="CURRENT PROFILE"
@@ -135,40 +185,6 @@ export default function DashboardPage() {
               onPress={() => setSelectedMetric("vo2Max")}
             />
           </View>
-
-          <SectionHeader
-            eyebrow="TODAY"
-            title="Daily workout"
-            aside={formatFullDate(today.date)}
-            action="View week →"
-            onPress={() => router.push("/training")}
-          />
-
-          <Pressable
-            onPress={() => router.push("/training")}
-            style={({ pressed }) => [
-              styles.workoutCard,
-              pressed ? styles.pressed : undefined,
-            ]}
-          >
-            <View style={[styles.workoutMain, compact ? styles.workoutMainCompact : undefined]}>
-              <View style={styles.workoutIcon}>
-                <Text style={styles.workoutIconText}>○</Text>
-              </View>
-              <View style={styles.workoutCopy}>
-                <Text style={styles.workoutEyebrow}>{todayWorkout.detail.toUpperCase()}</Text>
-                <Text style={styles.workoutTitle}>{todayWorkout.title}</Text>
-                <Text style={styles.workoutDescription}>{todayWorkout.description}</Text>
-              </View>
-              <Text style={styles.workoutArrow}>→</Text>
-            </View>
-
-            <View style={[styles.workoutFooter, compact ? styles.workoutFooterCompact : undefined]}>
-              <Meta label="STATUS" value={availability.loading ? "Loading plan" : availability.error ? "Plan unavailable" : today.workout ? "Suggested" : "No workout assigned"} />
-              <Meta label="CURRENT FOCUS" value={isLoading ? "Loading…" : error ? "Focus unavailable" : focus.title} />
-              <Meta label="WEEK" value={formatWeekRange(week.startDate, week.endDate)} />
-            </View>
-          </Pressable>
 
           <SectionHeader eyebrow="QUICK ACCESS" title="Keep moving" />
           <View style={[styles.quickGrid, compact ? styles.stack : undefined]}>
@@ -340,6 +356,15 @@ function QuickLink({
   );
 }
 
+function DashboardStat({ value, label }: { value: string; label: string }) {
+  return (
+    <View style={styles.dashboardStat}>
+      <Text style={styles.dashboardStatValue}>{value}</Text>
+      <Text style={styles.dashboardStatLabel}>{label}</Text>
+    </View>
+  );
+}
+
 function Meta({ label, value }: { label: string; value: string }) {
   return (
     <View>
@@ -391,11 +416,11 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 145 },
   container: {
     width: "100%",
-    maxWidth: 1100,
+    maxWidth: 1120,
     alignSelf: "center",
-    paddingHorizontal: 30,
+    paddingHorizontal: 24,
   },
-  containerCompact: { paddingHorizontal: 18 },
+  containerCompact: { paddingHorizontal: 24 },
   header: {
     height: 82,
     flexDirection: "row",
@@ -414,12 +439,13 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.glass,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: theme.colors.glassBorder,
+    boxShadow: theme.shadows.soft,
   },
   avatarText: { color: theme.colors.text, fontSize: 14, fontWeight: "700" },
-  hero: { paddingTop: 18, paddingBottom: 27 },
+  hero: { paddingTop: 18, paddingBottom: 30 },
   heroEyebrow: {
     color: theme.colors.accent,
     fontSize: 9,
@@ -428,13 +454,13 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: theme.colors.text,
-    fontSize: 31,
-    lineHeight: 37,
+    fontSize: 42,
+    lineHeight: 48,
     fontWeight: "700",
     letterSpacing: -1.1,
     marginTop: 7,
   },
-  heroTitleCompact: { fontSize: 27, lineHeight: 33 },
+  heroTitleCompact: { fontSize: 34, lineHeight: 40 },
   heroSubtitle: { color: theme.colors.textSecondary, fontSize: 13, marginTop: 7 },
   errorCard: {
     backgroundColor: "#FDECEC",
@@ -466,16 +492,18 @@ const styles = StyleSheet.create({
   },
   sectionAside: { color: theme.colors.textSecondary, fontSize: 11, textAlign: "right" },
   sectionAction: { color: theme.colors.accent, fontSize: 12, fontWeight: "700" },
+  dashboardLead: { flexDirection: "row", alignItems: "stretch", gap: 16 },
   metrics: { flexDirection: "row", gap: 13 },
   stack: { flexDirection: "column" },
   metricCard: {
     flex: 1,
     minHeight: 168,
     padding: 20,
-    borderRadius: 18,
-    backgroundColor: theme.colors.surface,
+    borderRadius: 22,
+    backgroundColor: theme.colors.glass,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: theme.colors.glassBorder,
+    boxShadow: theme.shadows.insetLike,
   },
   metricHeader: {
     flexDirection: "row",
@@ -494,41 +522,56 @@ const styles = StyleSheet.create({
   metricUnit: { color: theme.colors.textSecondary, fontSize: 13, marginLeft: 5 },
   metricDetail: { color: theme.colors.textSecondary, fontSize: 10, marginTop: 4 },
   workoutCard: {
-    borderRadius: 20,
+    flex: 1.45,
+    minHeight: 290,
+    overflow: "hidden",
+    borderRadius: 28,
     padding: 24,
-    backgroundColor: theme.colors.text,
+    backgroundColor: theme.colors.darkSurface,
+    boxShadow: theme.shadows.raised,
   },
-  workoutMain: { flexDirection: "row", alignItems: "center", gap: 18 },
-  workoutMainCompact: { alignItems: "flex-start" },
+  workoutCardGlow: { position: "absolute", width: 260, height: 260, borderRadius: 130, right: -90, top: -120, backgroundColor: "rgba(23,107,89,0.48)" },
+  workoutTopline: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 18 },
   workoutIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 50,
+    height: 50,
+    borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#24302D",
+    backgroundColor: "rgba(255,255,255,0.11)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
   },
-  workoutIconText: { color: theme.colors.accent, fontSize: 24 },
-  workoutCopy: { flex: 1 },
+  workoutIconText: { color: "#A9D8CC", fontSize: 24 },
   workoutEyebrow: {
-    color: theme.colors.accent,
-    fontSize: 8,
+    color: "#A9D8CC",
+    fontSize: 9,
     fontWeight: "800",
     letterSpacing: 1.2,
   },
-  workoutTitle: { color: theme.colors.white, fontSize: 25, fontWeight: "700", marginTop: 5 },
-  workoutDescription: { color: "#B6BEBA", fontSize: 12, lineHeight: 19, marginTop: 8, maxWidth: 680 },
-  workoutArrow: { color: theme.colors.accent, fontSize: 24 },
-  workoutFooter: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 44,
-    marginTop: 22,
-    paddingTop: 18,
-    borderTopWidth: 1,
-    borderTopColor: "#2A2E2E",
-  },
-  workoutFooterCompact: { gap: 24 },
+  workoutDate: { color: "rgba(255,255,255,0.60)", fontSize: 12, marginTop: 6 },
+  workoutTitle: { color: theme.colors.white, fontSize: 29, lineHeight: 34, fontWeight: "700", letterSpacing: -0.7, marginTop: 34 },
+  workoutDescription: { color: "#B6BEBA", fontSize: 13, lineHeight: 20, marginTop: 9, maxWidth: 680 },
+  workoutActionRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: "auto", paddingTop: 24 },
+  workoutStatus: { color: "rgba(255,255,255,0.60)", fontSize: 12, fontWeight: "600" },
+  workoutAction: { color: theme.colors.white, fontSize: 12, fontWeight: "700", paddingHorizontal: 14, paddingVertical: 10, borderRadius: 13, backgroundColor: "rgba(255,255,255,0.10)" },
+  weekCard: { flex: 1, minWidth: 0, minHeight: 290, padding: 22, borderRadius: 28, backgroundColor: theme.colors.glass, borderWidth: 1, borderColor: theme.colors.glassBorder, boxShadow: theme.shadows.insetLike },
+  weekCardHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
+  weekCardTitle: { color: theme.colors.text, fontSize: 21, fontWeight: "700", marginTop: 6 },
+  weekRange: { color: theme.colors.textSecondary, fontSize: 10, marginTop: 2 },
+  weekStats: { flexDirection: "row", marginTop: 24, paddingVertical: 17, borderTopWidth: 1, borderBottomWidth: 1, borderColor: theme.colors.border },
+  dashboardStat: { flex: 1, alignItems: "center" },
+  dashboardStatValue: { color: theme.colors.text, fontSize: 22, fontWeight: "700" },
+  dashboardStatLabel: { color: theme.colors.textSecondary, fontSize: 10, marginTop: 3 },
+  weekFocus: { flexDirection: "row", alignItems: "center", gap: 11, marginTop: 17 },
+  weekFocusMark: { width: 34, height: 34, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: theme.colors.accentSoft },
+  weekFocusMarkText: { color: theme.colors.accent, fontSize: 16 },
+  weekFocusCopy: { flex: 1 },
+  weekFocusLabel: { color: theme.colors.textSecondary, fontSize: 8, fontWeight: "800", letterSpacing: 1 },
+  weekFocusValue: { color: theme.colors.text, fontSize: 13, fontWeight: "700", marginTop: 3 },
+  weekLink: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: "auto", paddingTop: 16 },
+  weekLinkText: { color: theme.colors.accent, fontSize: 12, fontWeight: "700" },
+  weekLinkArrow: { color: theme.colors.accent, fontSize: 17 },
   metaLabel: { color: "#7F8884", fontSize: 8, fontWeight: "800", letterSpacing: 1 },
   metaValue: { color: theme.colors.white, fontSize: 11, fontWeight: "600", marginTop: 4 },
   quickGrid: { flexDirection: "row", gap: 12 },
@@ -539,10 +582,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     padding: 16,
-    borderRadius: 16,
-    backgroundColor: theme.colors.surface,
+    borderRadius: 20,
+    backgroundColor: theme.colors.glass,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: theme.colors.glassBorder,
+    boxShadow: theme.shadows.soft,
   },
   quickIcon: {
     width: 36,

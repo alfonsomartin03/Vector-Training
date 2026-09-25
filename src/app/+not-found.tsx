@@ -21,6 +21,6 @@ const styles = StyleSheet.create({
   eyebrow: { color: theme.colors.accent, fontSize: 11, fontWeight: "800", letterSpacing: 1.5 },
   title: { marginTop: 16, maxWidth: 650, color: theme.colors.text, fontSize: 44, lineHeight: 50, fontWeight: "700", textAlign: "center" },
   body: { marginTop: 16, maxWidth: 560, color: theme.colors.textSecondary, fontSize: 17, lineHeight: 26, textAlign: "center" },
-  button: { minHeight: 48, justifyContent: "center", marginTop: 28, paddingHorizontal: 22, borderRadius: 12, backgroundColor: theme.colors.text },
+  button: { minHeight: 48, justifyContent: "center", marginTop: 28, paddingHorizontal: 22, borderRadius: 15, backgroundColor: theme.colors.darkSurface, boxShadow: theme.shadows.soft },
   buttonText: { color: theme.colors.white, fontSize: 15, fontWeight: "700" },
 });

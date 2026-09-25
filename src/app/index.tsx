@@ -919,9 +919,10 @@ const styles = StyleSheet.create({
     minHeight: 440,
     padding: 28,
     borderRadius: 28,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.glass,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: theme.colors.glassBorder,
+    boxShadow: theme.shadows.raised,
   },
 
   heroVisualTablet: {
@@ -1193,8 +1194,9 @@ const styles = StyleSheet.create({
     padding: 28,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.glassBorder,
+    backgroundColor: theme.colors.glass,
+    boxShadow: theme.shadows.soft,
   },
 
   featureTop: {
@@ -1304,9 +1306,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 28,
     borderRadius: 24,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.glass,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: theme.colors.glassBorder,
+    boxShadow: theme.shadows.soft,
   },
 
   modelRow: {
@@ -1351,9 +1354,10 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 28,
     borderRadius: 22,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.glass,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: theme.colors.glassBorder,
+    boxShadow: theme.shadows.soft,
   },
 
   outputLabel: {
@@ -1381,9 +1385,10 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 30,
     borderRadius: 24,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.glass,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: theme.colors.glassBorder,
+    boxShadow: theme.shadows.soft,
   },
 
   adaptiveHeader: {
@@ -1466,9 +1471,10 @@ const styles = StyleSheet.create({
     paddingVertical: 90,
     paddingHorizontal: 50,
     borderRadius: 30,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.glass,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: theme.colors.glassBorder,
+    boxShadow: theme.shadows.raised,
   },
 
   ctaMobile: {

@@ -52,15 +52,15 @@ export default function ResetPasswordPage() {
 
 const styles = StyleSheet.create({
   page: { flex: 1, alignItems: "center", justifyContent: "center", padding: 20, backgroundColor: theme.colors.background },
-  card: { width: "100%", maxWidth: 520, padding: 28, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 18, backgroundColor: theme.colors.surface },
+  card: { width: "100%", maxWidth: 520, padding: 30, borderWidth: 1, borderColor: theme.colors.glassBorder, borderRadius: 28, backgroundColor: theme.colors.glass, boxShadow: theme.shadows.raised },
   eyebrow: { color: theme.colors.accent, fontSize: 10, fontWeight: "800", letterSpacing: 1.4 },
   title: { marginTop: 12, color: theme.colors.text, fontSize: 34, lineHeight: 40, fontWeight: "700" },
   body: { marginTop: 10, marginBottom: 24, color: theme.colors.textSecondary, fontSize: 14, lineHeight: 21 },
   label: { marginBottom: 7, color: theme.colors.textSecondary, fontSize: 13, fontWeight: "600" },
-  input: { minHeight: 52, marginBottom: 18, paddingHorizontal: 14, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, color: theme.colors.text, backgroundColor: theme.colors.background },
+  input: { minHeight: 52, marginBottom: 18, paddingHorizontal: 14, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 14, color: theme.colors.text, backgroundColor: theme.colors.glassStrong },
   error: { marginBottom: 12, color: "#A33A3A", fontSize: 13, lineHeight: 19 },
-  button: { minHeight: 50, alignItems: "center", justifyContent: "center", borderRadius: 12, backgroundColor: theme.colors.text },
+  button: { minHeight: 50, alignItems: "center", justifyContent: "center", borderRadius: 14, backgroundColor: theme.colors.darkSurface, boxShadow: theme.shadows.soft },
   disabled: { opacity: 0.45 },
   buttonText: { color: theme.colors.white, fontSize: 15, fontWeight: "700" },
-  link: { marginTop: 18, color: "#176B59", textAlign: "center", fontWeight: "700" },
+  link: { marginTop: 18, color: theme.colors.accent, textAlign: "center", fontWeight: "700" },
 });

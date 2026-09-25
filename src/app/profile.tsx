@@ -204,22 +204,38 @@ export default function ProfilePage() {
             </View>
           </View>
 
-          {/* Profile header */}
-          <View style={styles.profileHeader}>
-            <View style={styles.largeAvatar}>
-              <Text style={styles.largeAvatarText}>{initials}</Text>
+          <View style={styles.profileHero}>
+            <View style={styles.profileGlow} />
+            <View style={styles.profileHeader}>
+              <View style={styles.largeAvatar}>
+                <Text style={styles.largeAvatarText}>{initials}</Text>
+              </View>
+
+              <View style={styles.profileIdentity}>
+                <Text style={styles.profileEyebrow}>ATHLETE PROFILE</Text>
+                <Text style={styles.name}>
+                  {isLoadingProfile ? "Loading..." : fullName}
+                </Text>
+
+                <Text style={styles.profileSub}>
+                  {isLoadingProfile
+                    ? "Loading athlete profile..."
+                    : profileSubtitle}
+                </Text>
+              </View>
+              <View style={styles.profileStatus}>
+                <View style={styles.profileStatusDot} />
+                <Text style={styles.profileStatusText}>Active</Text>
+              </View>
             </View>
 
-            <View>
-              <Text style={styles.name}>
-                {isLoadingProfile ? "Loading..." : fullName}
-              </Text>
-
-              <Text style={styles.profileSub}>
-                {isLoadingProfile
-                  ? "Loading athlete profile..."
-                  : profileSubtitle}
-              </Text>
+            <View style={styles.quickStats}>
+              <QuickStat label="Body mass" value={isLoadingProfile ? "..." : bodyMass} />
+              <QuickStat label="Training" value={isLoadingProfile ? "..." : trainingVolume} />
+              <QuickStat
+                label={athleteModel?.vo2MaxSource === "measured" ? "VO₂max" : "Est. VO₂max"}
+                value={isLoadingProfile ? "..." : athleteModel ? `${athleteModel.vo2Max.toFixed(1)} mL/kg/min` : "—"}
+              />
             </View>
           </View>
 
@@ -231,32 +247,8 @@ export default function ProfilePage() {
             </View>
           ) : null}
 
-          {/* Quick stats */}
-          <View style={styles.quickStats}>
-            <QuickStat
-              label="Body mass"
-              value={isLoadingProfile ? "..." : bodyMass}
-            />
-
-            <QuickStat
-              label="Training"
-              value={isLoadingProfile ? "..." : trainingVolume}
-            />
-
-            <QuickStat
-              label={athleteModel?.vo2MaxSource === "measured" ? "VO₂max" : "Est. VO₂max"}
-              value={
-                isLoadingProfile
-                  ? "..."
-                  : athleteModel
-                    ? `${athleteModel.vo2Max.toFixed(1)} mL/kg/min`
-                    : "—"
-              }
-            />
-          </View>
-
           {/* Athlete */}
-          <Text style={styles.sectionTitle}>Athlete</Text>
+          <SectionHeading eyebrow="TRAINING IDENTITY" title="Athlete details" />
 
           <View style={styles.card}>
             <Row
@@ -307,9 +299,10 @@ export default function ProfilePage() {
 
           {/* Current model */}
           <View style={styles.modelSectionHeader}>
-            <Text style={styles.modelSectionTitle}>
-              Current model
-            </Text>
+            <View>
+              <Text style={styles.sectionEyebrow}>POWER PROFILE</Text>
+              <Text style={styles.modelSectionTitle}>Current model</Text>
+            </View>
 
             <Pressable
               style={({ pressed }) => [
@@ -369,7 +362,7 @@ export default function ProfilePage() {
           </View>
 
           {/* Connections */}
-          <Text style={styles.sectionTitle}>Connections</Text>
+          <SectionHeading eyebrow="INTEGRATIONS" title="Connections" />
 
           <View style={styles.card}>
             <Connection name="Strava" status="Coming soon" />
@@ -382,7 +375,7 @@ export default function ProfilePage() {
           </View>
 
           {/* Account */}
-          <Text style={styles.sectionTitle}>Account</Text>
+          <SectionHeading eyebrow="SECURITY" title="Account" />
 
           <View style={styles.card}>
             <Row
@@ -556,6 +549,15 @@ type QuickStatProps = {
   value: string;
 };
 
+function SectionHeading({ eyebrow, title }: { eyebrow: string; title: string }) {
+  return (
+    <View style={styles.sectionHeading}>
+      <Text style={styles.sectionEyebrow}>{eyebrow}</Text>
+      <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
+  );
+}
+
 function QuickStat({
   label,
   value,
@@ -683,13 +685,13 @@ const styles = StyleSheet.create({
 
   container: {
     width: "100%",
-    maxWidth: 950,
+    maxWidth: 1120,
     alignSelf: "center",
     paddingHorizontal: 24,
   },
 
   header: {
-    height: 90,
+    height: 82,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -706,11 +708,12 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.glass,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: theme.colors.glassBorder,
     alignItems: "center",
     justifyContent: "center",
+    boxShadow: theme.shadows.soft,
   },
 
   avatarText: {
@@ -718,12 +721,30 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
+  profileHero: {
+    overflow: "hidden",
+    marginTop: 28,
+    padding: 26,
+    borderRadius: 30,
+    backgroundColor: theme.colors.darkSurface,
+    boxShadow: theme.shadows.raised,
+  },
+
+  profileGlow: {
+    position: "absolute",
+    width: 280,
+    height: 280,
+    right: -100,
+    top: -150,
+    borderRadius: 140,
+    backgroundColor: "rgba(23,107,89,0.48)",
+  },
+
   profileHeader: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
     gap: 20,
-    paddingTop: 44,
-    paddingBottom: 38,
   },
 
   largeAvatar: {
@@ -732,7 +753,9 @@ const styles = StyleSheet.create({
     borderRadius: 38,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.text,
+    backgroundColor: "rgba(255,255,255,0.11)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
   },
 
   largeAvatarText: {
@@ -741,61 +764,74 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
+  profileIdentity: { flex: 1, minWidth: 190 },
+
+  profileEyebrow: { color: "#A9D8CC", fontSize: 9, fontWeight: "800", letterSpacing: 1.3, marginBottom: 6 },
+
   name: {
-    color: theme.colors.text,
+    color: theme.colors.white,
     fontSize: 30,
     fontWeight: "700",
     letterSpacing: -1,
   },
 
   profileSub: {
-    color: theme.colors.textSecondary,
+    color: "rgba(255,255,255,0.64)",
     fontSize: 13,
     marginTop: 5,
   },
+
+  profileStatus: { flexDirection: "row", alignItems: "center", gap: 7, alignSelf: "flex-start", paddingHorizontal: 11, paddingVertical: 7, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.10)" },
+  profileStatusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#75B9A8" },
+  profileStatusText: { color: "rgba(255,255,255,0.76)", fontSize: 10, fontWeight: "700" },
 
   quickStats: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
-    marginBottom: 48,
+    marginTop: 28,
+    paddingTop: 22,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.12)",
   },
 
   quickStat: {
     flex: 1,
     minWidth: 180,
     padding: 18,
-    borderRadius: 15,
-    backgroundColor: theme.colors.surface,
+    borderRadius: 17,
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: "rgba(255,255,255,0.10)",
   },
 
   quickLabel: {
-    color: theme.colors.textSecondary,
+    color: "rgba(255,255,255,0.56)",
     fontSize: 10,
   },
 
   quickValue: {
-    color: theme.colors.text,
+    color: theme.colors.white,
     fontSize: 17,
     fontWeight: "600",
     marginTop: 5,
   },
 
+  sectionHeading: { marginTop: 38, marginBottom: 13 },
+  sectionEyebrow: { color: theme.colors.accent, fontSize: 9, fontWeight: "800", letterSpacing: 1.2 },
   sectionTitle: {
     color: theme.colors.text,
     fontSize: 20,
     fontWeight: "600",
-    marginBottom: 12,
-    marginTop: 28,
+    marginTop: 6,
   },
 
   card: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.glass,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 18,
+    borderRadius: 22,
+    borderColor: theme.colors.glassBorder,
+    boxShadow: theme.shadows.soft,
     overflow: "hidden",
   },
 
@@ -889,8 +925,9 @@ const styles = StyleSheet.create({
 
   modelCard: {
     flexDirection: "row",
-    backgroundColor: theme.colors.text,
-    borderRadius: 18,
+    backgroundColor: theme.colors.darkSurface,
+    borderRadius: 22,
+    boxShadow: theme.shadows.raised,
     paddingVertical: 25,
   },
 
@@ -996,11 +1033,12 @@ const styles = StyleSheet.create({
   modalCard: {
     width: "100%",
     maxWidth: 480,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.glassStrong,
+    borderRadius: 24,
     padding: 24,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: theme.colors.glassBorder,
+    boxShadow: theme.shadows.raised,
   },
 
   modalHeader: {

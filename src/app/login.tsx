@@ -344,6 +344,12 @@ const styles = StyleSheet.create({
   form: {
     width: "100%",
     maxWidth: 420,
+    padding: 30,
+    borderRadius: 28,
+    backgroundColor: theme.colors.glass,
+    borderWidth: 1,
+    borderColor: theme.colors.glassBorder,
+    boxShadow: theme.shadows.raised,
   },
 
   mobileLogo: {
@@ -385,7 +391,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.glassStrong,
     color: theme.colors.text,
     fontSize: 14,
   },
@@ -436,7 +442,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.text,
+    backgroundColor: theme.colors.darkSurface,
+    boxShadow: theme.shadows.soft,
   },
 
   signInButtonDisabled: {
@@ -474,6 +481,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
+    backgroundColor: theme.colors.glassStrong,
   },
 
   createText: {

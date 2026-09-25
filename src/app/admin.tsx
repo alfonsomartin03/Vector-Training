@@ -211,7 +211,7 @@ function Action({ label, onPress, disabled = false, primary = false }: { label: 
 
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: theme.colors.background },
-  container: { width: "100%", maxWidth: 1350, alignSelf: "center", padding: 24, paddingBottom: 80, gap: 24 },
+  container: { width: "100%", maxWidth: 1120, alignSelf: "center", padding: 24, paddingBottom: 80, gap: 24 },
   heading: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 18, paddingVertical: 24 },
   title: { fontSize: 36, fontWeight: "700", color: theme.colors.text, marginVertical: 12 },
   eyebrow: { fontSize: 11, letterSpacing: 1.4, fontWeight: "700", color: theme.colors.textSecondary },
@@ -219,10 +219,10 @@ const styles = StyleSheet.create({
   copy: { fontSize: 14, lineHeight: 22, color: theme.colors.textSecondary },
   columns: { flexDirection: "row", alignItems: "flex-start", gap: 24 }, stacked: { flexDirection: "column" },
   directory: { width: 340 }, fullWidth: { width: "100%" }, detail: { flex: 1, width: "100%", minWidth: 0 },
-  card: { padding: 22, borderRadius: 18, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: "white", gap: 16 },
+  card: { padding: 22, borderRadius: 22, borderWidth: 1, borderColor: theme.colors.glassBorder, backgroundColor: theme.colors.glass, gap: 16, boxShadow: theme.shadows.soft },
   editor: { gap: 20 }, field: { gap: 8 }, label: { fontSize: 14, fontWeight: "600", color: theme.colors.text },
-  input: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, padding: 12, minHeight: 44, backgroundColor: theme.colors.background, color: theme.colors.text },
-  userRow: { padding: 14, gap: 6, borderRadius: 10, borderWidth: 1, borderColor: theme.colors.border }, userName: { fontWeight: "600", fontSize: 15, color: theme.colors.text },
+  input: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, padding: 12, minHeight: 44, backgroundColor: theme.colors.glassStrong, color: theme.colors.text },
+  userRow: { padding: 14, gap: 6, borderRadius: 14, borderWidth: 1, borderColor: theme.colors.border }, userName: { fontWeight: "600", fontSize: 15, color: theme.colors.text },
   selected: { backgroundColor: theme.colors.accentSoft, borderColor: theme.colors.accent },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border },

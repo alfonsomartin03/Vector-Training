@@ -12,7 +12,22 @@ export const theme = {
     accent: "#176B59",
     accentSoft: "#EAF7F3",
 
+    // Shared glass surfaces keep the product's warm, restrained palette while
+    // adding depth consistently across web and native layouts.
+    glass: "rgba(255, 255, 255, 0.78)",
+    glassStrong: "rgba(255, 255, 255, 0.92)",
+    glassBorder: "rgba(255, 255, 255, 0.96)",
+    accentGlass: "rgba(234, 247, 243, 0.78)",
+    darkSurface: "#16211F",
+    darkSurfaceSoft: "#24302D",
+
     white: "#FFFFFF",
+  },
+
+  shadows: {
+    soft: "0 10px 26px rgba(30, 43, 39, 0.08)",
+    raised: "0 18px 42px rgba(30, 43, 39, 0.13)",
+    insetLike: "8px 10px 24px rgba(42, 58, 52, 0.08), -7px -7px 22px rgba(255, 255, 255, 0.86)",
   },
 
   spacing: {

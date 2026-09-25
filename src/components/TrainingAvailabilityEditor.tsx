@@ -49,11 +49,11 @@ function Field({ label, value, onChange, disabled }: { label: string; value: str
   return <View><Text style={styles.copy}>{label}</Text><TextInput accessibilityLabel={label} keyboardType="decimal-pad" value={value} onChangeText={onChange} editable={!disabled} style={styles.input} /></View>;
 }
 const styles = StyleSheet.create({
-  card: { marginTop: 24, padding: 22, gap: 14, borderRadius: 18, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border },
+  card: { marginTop: 24, padding: 22, gap: 14, borderRadius: 22, backgroundColor: theme.colors.glass, borderWidth: 1, borderColor: theme.colors.glassBorder, boxShadow: theme.shadows.soft },
   title: { fontSize: 20, fontWeight: "700", color: theme.colors.text },
   copy: { fontSize: 13, lineHeight: 20, color: theme.colors.textSecondary },
-  input: { borderWidth: 1, borderColor: theme.colors.border, padding: 12, borderRadius: 8, color: theme.colors.text, marginTop: 5 },
-  button: { padding: 12, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, alignItems: "center" },
+  input: { borderWidth: 1, borderColor: theme.colors.border, padding: 12, borderRadius: 12, color: theme.colors.text, backgroundColor: theme.colors.glassStrong, marginTop: 5 },
+  button: { padding: 12, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, alignItems: "center", backgroundColor: theme.colors.glass },
   selected: { backgroundColor: theme.colors.accentSoft, borderColor: theme.colors.accent },
   days: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
 });

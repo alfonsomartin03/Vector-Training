@@ -2305,7 +2305,7 @@ const styles = StyleSheet.create({
 
   contentContainer: {
     width: "100%",
-    maxWidth: 1100,
+    maxWidth: 1120,
     alignSelf: "center",
     paddingHorizontal: 32,
   },
@@ -2422,13 +2422,13 @@ const styles = StyleSheet.create({
   card: {
     width: "100%",
     backgroundColor:
-      theme.colors.surface,
+      theme.colors.glass,
     borderWidth: 1,
     borderColor:
-      theme.colors.border,
-    borderRadius:
-      theme.radius.lg,
+      theme.colors.glassBorder,
+    borderRadius: 28,
     padding: 38,
+    boxShadow: theme.shadows.raised,
   },
 
   cardMobile: {
@@ -2583,7 +2583,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor:
-      "#FAFBF9",
+      theme.colors.glassStrong,
     borderWidth: 1.5,
     borderColor:
       "#D6DAD5",
@@ -2670,7 +2670,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor:
-      "#FAFBF9",
+      theme.colors.glassStrong,
     borderWidth: 1,
     borderColor:
       "#D6DAD5",
@@ -2707,7 +2707,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 24,
     backgroundColor:
-      "#FAFBF9",
+      theme.colors.glassStrong,
     borderWidth: 1,
     borderColor:
       "#D6DAD5",
@@ -2754,7 +2754,7 @@ const styles = StyleSheet.create({
   historyOption: {
     padding: 15,
     backgroundColor:
-      "#FAFBF9",
+      theme.colors.glassStrong,
     borderWidth: 1,
     borderColor:
       "#D6DAD5",
@@ -2797,7 +2797,7 @@ const styles = StyleSheet.create({
     paddingHorizontal:
       theme.spacing.md,
     backgroundColor:
-      "#FAFBF9",
+      theme.colors.glassStrong,
     borderWidth: 1.5,
     borderColor:
       "#D6DAD5",
@@ -2851,9 +2851,8 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 20,
     backgroundColor:
-      theme.colors.accentSoft,
-    borderRadius:
-      theme.radius.md,
+      theme.colors.accentGlass,
+    borderRadius: 18,
   },
 
   infoMarker: {
@@ -2889,7 +2888,7 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 12,
     backgroundColor:
-      "#FAFBF9",
+      theme.colors.glassStrong,
     borderWidth: 1,
     borderColor:
       "#D6DAD5",

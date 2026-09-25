@@ -52,19 +52,20 @@ const styles = StyleSheet.create({
     minHeight: 50,
     paddingHorizontal: 22,
     paddingVertical: 14,
-    borderRadius: theme.radius.md,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
   },
 
   primary: {
-    backgroundColor: theme.colors.text,
+    backgroundColor: theme.colors.darkSurface,
+    boxShadow: theme.shadows.soft,
   },
 
   secondary: {
-    backgroundColor: "transparent",
+    backgroundColor: theme.colors.glass,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: theme.colors.glassBorder,
   },
 
   pressed: {

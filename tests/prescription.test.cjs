@@ -61,6 +61,13 @@ test("experience and fitness limit the interval dose; unknown recent volume is e
   assert.equal(recommendAvailability(athlete(), Infinity).weeklyMinutes, 180);
   assert.ok(recommendAvailability(athlete(), 1800).weeklyMinutes <= 900);
 });
+test("weekly volume is driven by availability and recent training, not a hidden six-hour fitness cap", () => {
+  const twelveHours = { ...base, weekly_minutes: 720, recent_weekly_minutes: 720, max_session_minutes: 180, rest_days: [2, 4] };
+  const beginnerPlan = prescribeWeek(athlete(0.7, "beginner"), twelveHours, now);
+  assert.ok(beginnerPlan.totalMinutes > 360);
+  assert.ok(beginnerPlan.totalMinutes <= 720);
+  assert.ok(beginnerPlan.qualitySessions <= 1);
+});
 test("future planning rechecks test freshness at the planned date", () => {
   const future = new Date(now.getTime() + 100 * 86400000);
   const plan = prescribeWeek(athlete(), base, future, now);

@@ -25,6 +25,7 @@ import {
 import { useAthleteData } from "../hooks/useAthleteData";
 
 import { buildAthleteModel } from "../lib/physiology/athleteModel";
+import { isValidCriticalPowerProfile } from "../lib/physiology/criticalPower";
 import { getTrainingFocusDisplay } from "../lib/training/focus";
 import { useTrainingAvailability } from "../hooks/useTrainingAvailability";
 import { weekKey } from "../lib/training/prescription";
@@ -133,6 +134,13 @@ export default function ProfilePage() {
       twelveMinute <= 0
     ) {
       setPowerError("Enter valid power values greater than 0.");
+      return;
+    }
+
+    if (!isValidCriticalPowerProfile(oneMinute, fiveMinute, twelveMinute)) {
+      setPowerError(
+        "These efforts do not produce a valid Critical Power model. Confirm that power decreases from 1 to 5 to 12 minutes and that each effort was maximal."
+      );
       return;
     }
 

@@ -81,6 +81,27 @@ export function calculateCriticalPowerFromProfile(
 }
 
 /**
+ * Check profile efforts without making form and legacy-data callers rely on
+ * exceptions for an expected validation outcome.
+ */
+export function isValidCriticalPowerProfile(
+  oneMinuteWatts: number,
+  fiveMinuteWatts: number,
+  twelveMinuteWatts: number
+): boolean {
+  try {
+    calculateCriticalPowerFromProfile(
+      oneMinuteWatts,
+      fiveMinuteWatts,
+      twelveMinuteWatts
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Fit Morton's three-parameter CP model.
  *
  * For three observations:

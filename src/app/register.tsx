@@ -20,6 +20,7 @@ import { supabase } from "@/lib/supabase";
 import { theme } from "../constants/theme";
 import { TrainingAvailabilityEditor } from "../components/TrainingAvailabilityEditor";
 import { isValidEmail, MIN_PASSWORD_LENGTH, passwordRequirements } from "../lib/accountValidation";
+import { isValidCriticalPowerProfile } from "../lib/physiology/criticalPower";
 import { validateAvailability, weekKey, type Availability } from "../lib/training/prescription";
 
 /* -------------------------------------------------------------------------- */
@@ -183,6 +184,11 @@ export default function RegisterScreen() {
     fiveMinuteWatts > twelveMinuteWatts &&
     twelveMinuteWatts > 0 &&
     oneMinuteWatts <= 5000 &&
+    isValidCriticalPowerProfile(
+      oneMinuteWatts,
+      fiveMinuteWatts,
+      twelveMinuteWatts
+    ) &&
     data.powerProfile.maximalEffortsConfirmed;
 
   /* ------------------------------------------------------------------------ */
@@ -333,7 +339,7 @@ export default function RegisterScreen() {
 
     if (!physiologicalValid || !powerValid) {
       setSubmitError(
-        "Please complete all required fields before creating your profile."
+        "Please complete all required fields and enter maximal efforts that produce a valid Critical Power model."
       );
 
       return;
@@ -1297,39 +1303,6 @@ function AthleteStep({
         }
       />
 
-      <Text style={styles.label}>
-        Average weekly training — past month
-      </Text>
-
-      <OptionRow
-        options={[
-          {
-            label: "1–5 h",
-            value: "1-5",
-          },
-
-          {
-            label: "6–12 h",
-            value: "6-12",
-          },
-
-          {
-            label: "12+ h",
-            value: "12+",
-          },
-        ]}
-        selected={
-          data.physiological
-            .weeklyVolume
-        }
-        onSelect={(value) =>
-          updatePhys(
-            "weeklyVolume",
-            value
-          )
-        }
-      />
-
       <TrainingAvailabilityEditor
         athlete={null}
         value={data.availability}
@@ -1338,7 +1311,16 @@ function AthleteStep({
         onboarding
         onDirty={() => setData(previous => ({ ...previous, availability: null }))}
         onSave={async availability => {
-          setData(previous => ({ ...previous, availability }));
+          setData(previous => ({
+            ...previous,
+            availability,
+            physiological: {
+              ...previous.physiological,
+              weeklyVolume: weeklyVolumeFromMinutes(
+                availability.recent_weekly_minutes
+              ),
+            },
+          }));
         }}
       />
 
@@ -2259,6 +2241,15 @@ function sanitizeInteger(
     /[^0-9]/g,
     ""
   );
+}
+
+function weeklyVolumeFromMinutes(
+  minutes: number
+): RegistrationData["physiological"]["weeklyVolume"] {
+  const hours = minutes / 60;
+  if (hours > 12) return "12+";
+  if (hours > 5) return "6-12";
+  return "1-5";
 }
 
 function sanitizeDecimal(

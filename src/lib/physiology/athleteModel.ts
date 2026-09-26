@@ -107,12 +107,9 @@ export function buildAthleteModel(
         fiveMinuteWatts,
         twelveMinuteWatts
       );
-  } catch (error) {
-    console.error(
-      "Unable to calculate Critical Power model:",
-      error
-    );
-
+  } catch {
+    // Older rows can predate the current CP-profile validation. Treat them as
+    // unavailable model data until the athlete updates their test results.
     return null;
   }
 

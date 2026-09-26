@@ -145,7 +145,7 @@ export function prescribeWeek(
   const tier = !experienced || recommendation.level === "beginner" ? 0 : recommendation.level === "amateur" ? 1 : 2;
   const recoveryReason = determineRecoveryReason(availability, completed, calendar.startDate);
   const recoveryWeek = recoveryReason !== null;
-  const budget = calculateWeeklyBudget(availability, completed, tier, recoveryWeek, calendar.startDate);
+  const budget = calculateWeeklyBudget(availability, completed, recoveryWeek, calendar.startDate);
   const available = calendar.days.map((_, index) => index).filter(index => !availability.rest_days.includes(index));
   if (available.length === 7) { available.shift(); messages.push("Monday reserved for recovery: at least one full rest day is retained."); }
 
@@ -295,8 +295,7 @@ function determineRecoveryReason(availability: Availability, history: CompletedW
   return null;
 }
 
-function calculateWeeklyBudget(availability: Availability, history: CompletedWorkout[], tier: number, recoveryWeek: boolean, weekStart: Date) {
-  const cap = tier === 0 ? 360 : tier === 1 ? 600 : 900;
+function calculateWeeklyBudget(availability: Availability, history: CompletedWorkout[], recoveryWeek: boolean, weekStart: Date) {
   const priorWeek = weekKey(new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() - 7));
   const prior = history.filter(item => weekKey(new Date(`${item.scheduled_date}T12:00:00`)) === priorWeek);
   const priorPlanned = prior.reduce((total, item) => total + item.planned_duration_minutes, 0);
@@ -311,7 +310,10 @@ function calculateWeeklyBudget(availability: Availability, history: CompletedWor
       ? Math.min(statedBaseline, priorCompleted)
       : Math.max(statedBaseline, priorCompleted);
   const progressionMultiplier = reliableCompletion !== null && reliableCompletion >= 0.85 ? 1.05 : 1;
-  let budget = Math.min(availability.weekly_minutes, cap, baseline * progressionMultiplier);
+  // Availability is the ceiling. Recent training still prevents an abrupt
+  // increase, but fitness classification must not silently replace the
+  // schedule and training history entered by the athlete.
+  let budget = Math.min(availability.weekly_minutes, baseline * progressionMultiplier);
   if (recoveryWeek) budget *= 0.6;
   return Math.max(0, Math.floor(budget));
 }

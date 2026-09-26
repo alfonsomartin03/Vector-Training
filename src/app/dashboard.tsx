@@ -11,6 +11,7 @@ import {
 
 import { theme } from "../constants/theme";
 import { AppBottomNav } from "../components/AppBottomNav";
+import { AppHeader } from "../components/AppHeader";
 import { MetricTrend } from "../components/MetricTrend";
 import { MetricTrendModal } from "../components/MetricTrendModal";
 import { useAuth } from "../context/AuthContext";
@@ -78,14 +79,7 @@ export default function DashboardPage() {
         contentContainerStyle={styles.scrollContent}
       >
         <View style={[styles.container, compact ? styles.containerCompact : undefined]}>
-          <View style={styles.header}>
-            <Pressable onPress={() => router.push("/")}>
-              <Text style={styles.logo}>VECTOR</Text>
-            </Pressable>
-            <Pressable style={styles.avatar} onPress={() => router.push("/profile")}>
-              <Text style={styles.avatarText}>{firstInitial}</Text>
-            </Pressable>
-          </View>
+          <AppHeader initial={firstInitial} />
 
           <View style={styles.hero}>
             <Text style={styles.heroEyebrow}>{getGreeting()}</Text>
@@ -223,6 +217,13 @@ export default function DashboardPage() {
             trend: progress?.[selectedMetric] ?? null,
             decimals: DASHBOARD_METRICS[selectedMetric].decimals,
           }]}
+          profileMetrics={[
+            { id: "criticalPower", label: "CRITICAL POWER", value: model ? `${Math.round(model.cpWatts)}` : "—", unit: "W", trend: progress?.criticalPower ?? null },
+            { id: "wPrime", label: "W′", value: model ? model.wPrimeKj.toFixed(1) : "—", unit: "kJ", trend: progress?.wPrime ?? null },
+            { id: "vo2Max", label: model?.vo2MaxSource === "measured" ? "VO₂MAX" : "EST. VO₂MAX", value: model ? model.vo2Max.toFixed(1) : "—", unit: "", trend: progress?.vo2Max ?? null },
+          ]}
+          activeMetric={selectedMetric}
+          priority={focus.title}
           onClose={() => setSelectedMetric(null)}
         />
       ) : null}
@@ -365,15 +366,6 @@ function DashboardStat({ value, label }: { value: string; label: string }) {
   );
 }
 
-function Meta({ label, value }: { label: string; value: string }) {
-  return (
-    <View>
-      <Text style={styles.metaLabel}>{label}</Text>
-      <Text style={styles.metaValue}>{value}</Text>
-    </View>
-  );
-}
-
 function getGreeting() {
   const hour = new Date().getHours();
   if (hour < 12) return "GOOD MORNING";
@@ -416,35 +408,11 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 145 },
   container: {
     width: "100%",
-    maxWidth: 1120,
+    maxWidth: theme.layout.contentMaxWidth,
     alignSelf: "center",
-    paddingHorizontal: 24,
+    paddingHorizontal: theme.layout.pagePadding,
   },
-  containerCompact: { paddingHorizontal: 24 },
-  header: {
-    height: 82,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  logo: {
-    color: theme.colors.text,
-    fontSize: 18,
-    fontWeight: "800",
-    letterSpacing: 4,
-  },
-  avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: theme.colors.glass,
-    borderWidth: 1,
-    borderColor: theme.colors.glassBorder,
-    boxShadow: theme.shadows.soft,
-  },
-  avatarText: { color: theme.colors.text, fontSize: 14, fontWeight: "700" },
+  containerCompact: { paddingHorizontal: theme.layout.pagePadding },
   hero: { paddingTop: 18, paddingBottom: 30 },
   heroEyebrow: {
     color: theme.colors.accent,
@@ -572,8 +540,6 @@ const styles = StyleSheet.create({
   weekLink: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: "auto", paddingTop: 16 },
   weekLinkText: { color: theme.colors.accent, fontSize: 12, fontWeight: "700" },
   weekLinkArrow: { color: theme.colors.accent, fontSize: 17 },
-  metaLabel: { color: "#7F8884", fontSize: 8, fontWeight: "800", letterSpacing: 1 },
-  metaValue: { color: theme.colors.white, fontSize: 11, fontWeight: "600", marginTop: 4 },
   quickGrid: { flexDirection: "row", gap: 12 },
   quickCard: {
     flex: 1,

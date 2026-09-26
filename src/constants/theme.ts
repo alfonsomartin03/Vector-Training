@@ -30,6 +30,12 @@ export const theme = {
     insetLike: "8px 10px 24px rgba(42, 58, 52, 0.08), -7px -7px 22px rgba(255, 255, 255, 0.86)",
   },
 
+  layout: {
+    contentMaxWidth: 1120,
+    appHeaderHeight: 82,
+    pagePadding: 24,
+  },
+
   spacing: {
     xs: 6,
     sm: 10,

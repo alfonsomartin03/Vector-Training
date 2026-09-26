@@ -13,6 +13,7 @@ import { useMemo, useState } from "react";
 
 import { theme } from "../constants/theme";
 import { AppBottomNav } from "../components/AppBottomNav";
+import { AppHeader } from "../components/AppHeader";
 import { AccountDeletePanel } from "../components/AccountDeletePanel";
 import { useAdminAccess } from "../hooks/useAdminAccess";
 import { supabase } from "../lib/supabase";
@@ -193,16 +194,7 @@ export default function ProfilePage() {
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Pressable onPress={() => router.push("/")}>
-              <Text style={styles.logo}>VECTOR</Text>
-            </Pressable>
-
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{firstInitial}</Text>
-            </View>
-          </View>
+          <AppHeader initial={firstInitial} />
 
           <View style={styles.profileHero}>
             <View style={styles.profileGlow} />
@@ -685,41 +677,11 @@ const styles = StyleSheet.create({
 
   container: {
     width: "100%",
-    maxWidth: 1120,
+    maxWidth: theme.layout.contentMaxWidth,
     alignSelf: "center",
-    paddingHorizontal: 24,
+    paddingHorizontal: theme.layout.pagePadding,
   },
 
-  header: {
-    height: 82,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  logo: {
-    color: theme.colors.text,
-    fontSize: 18,
-    fontWeight: "800",
-    letterSpacing: 4,
-  },
-
-  avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: theme.colors.glass,
-    borderWidth: 1,
-    borderColor: theme.colors.glassBorder,
-    alignItems: "center",
-    justifyContent: "center",
-    boxShadow: theme.shadows.soft,
-  },
-
-  avatarText: {
-    color: theme.colors.text,
-    fontWeight: "700",
-  },
 
   profileHero: {
     overflow: "hidden",

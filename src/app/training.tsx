@@ -14,6 +14,7 @@ import {
 
 import { theme } from "../constants/theme";
 import { AppBottomNav } from "../components/AppBottomNav";
+import { AppHeader } from "../components/AppHeader";
 import { useAuth } from "../context/AuthContext";
 import { useAthleteData } from "../hooks/useAthleteData";
 import { getTrainingFocusDisplay } from "../lib/training/focus";
@@ -54,6 +55,7 @@ export default function TrainingPage() {
   ), [athlete, availability.availability, history.completedWorkouts, history.powerMaxima, selectedWeek]);
   const focus = getTrainingFocusDisplay(prescription.trainingFocus ?? athlete?.profile.training_focus);
   const focusTitle = isLoading ? "Loading…" : error ? "Focus unavailable" : focus.title;
+  const firstInitial = (athlete?.profile.first_name ?? "A").charAt(0).toUpperCase() || "A";
   const week = useMemo(
     () => buildWeeklyTrainingPlan(new Date(`${selectedWeek}T12:00:00`), prescription.assignments),
     [selectedWeek, prescription.assignments]
@@ -91,14 +93,7 @@ export default function TrainingPage() {
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.container}>
-          <View style={styles.header}>
-            <Pressable onPress={() => router.push("/")}>
-              <Text style={styles.logo}>VECTOR</Text>
-            </Pressable>
-            <Pressable style={styles.avatar} onPress={() => router.push("/profile")}>
-              <Text style={styles.avatarText}>A</Text>
-            </Pressable>
-          </View>
+          <AppHeader initial={firstInitial} />
 
           <View style={[styles.hero, compact ? styles.heroCompact : undefined]}>
             <View style={styles.heroCopy}>
@@ -531,11 +526,7 @@ function formatHours(minutes: number) {
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: theme.colors.background },
   scrollContent: { paddingBottom: 150 },
-  container: { width: "100%", maxWidth: 1120, alignSelf: "center", paddingHorizontal: 24 },
-  header: { height: 82, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  logo: { color: theme.colors.text, fontSize: 18, fontWeight: "800", letterSpacing: 4 },
-  avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: theme.colors.glass, borderWidth: 1, borderColor: theme.colors.glassBorder, alignItems: "center", justifyContent: "center", boxShadow: theme.shadows.soft },
-  avatarText: { color: theme.colors.text, fontWeight: "700" },
+  container: { width: "100%", maxWidth: theme.layout.contentMaxWidth, alignSelf: "center", paddingHorizontal: theme.layout.pagePadding },
   hero: { paddingTop: 18, paddingBottom: 26, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 20 },
   heroCompact: { alignItems: "flex-start", flexWrap: "wrap" },
   heroCopy: { flex: 1 },

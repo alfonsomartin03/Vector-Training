@@ -1,4 +1,3 @@
-import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import {
   Pressable,
@@ -9,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { AppBottomNav } from "../components/AppBottomNav";
+import { AppHeader } from "../components/AppHeader";
 
 import {
   LactateModal,
@@ -41,6 +41,7 @@ import {
   buildCriticalPowerZones,
   type CriticalPowerZone,
 } from "../lib/physiology/trainingZones";
+import { getTrainingFocusDisplay } from "../lib/training/focus";
 import type { LactateTest } from "../types/athlete";
 
 export default function PowerPage() {
@@ -93,6 +94,7 @@ export default function PowerPage() {
   const lactateTest = athlete?.lactateTest ?? null;
   const weight = Number(profile?.weight_kg);
   const firstInitial = (profile?.first_name ?? "A").charAt(0).toUpperCase() || "A";
+  const focus = getTrainingFocusDisplay(profile?.training_focus);
 
   async function handlePowerSave(values: PowerProfileUpdate) {
     if (!user) return;
@@ -128,14 +130,7 @@ export default function PowerPage() {
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.container}>
-          <View style={styles.header}>
-            <Pressable onPress={() => router.push("/")}>
-              <Text style={styles.logo}>VECTOR</Text>
-            </Pressable>
-            <Pressable style={styles.avatar} onPress={() => router.push("/profile")}>
-              <Text style={styles.avatarText}>{firstInitial}</Text>
-            </Pressable>
-          </View>
+          <AppHeader initial={firstInitial} />
 
           <View style={[styles.hero, compact ? styles.heroCompact : undefined]}>
             <View style={styles.heroCopy}>
@@ -414,6 +409,13 @@ export default function PowerPage() {
           description={POWER_METRICS[selectedMetric].description}
           unit={POWER_METRICS[selectedMetric].unit}
           series={selectedTrendSeries}
+          profileMetrics={selectedMetric === "lactateThresholds" ? undefined : [
+            { id: "criticalPower", label: "CRITICAL POWER", value: model ? `${Math.round(model.cpWatts)}` : "—", unit: "W", trend: progress?.criticalPower ?? null },
+            { id: "wPrime", label: "W′", value: model ? model.wPrimeKj.toFixed(1) : "—", unit: "kJ", trend: progress?.wPrime ?? null },
+            { id: "vo2Max", label: model?.vo2MaxSource === "measured" ? "VO₂MAX" : "EST. VO₂MAX", value: model ? model.vo2Max.toFixed(1) : "—", unit: "", trend: progress?.vo2Max ?? null },
+          ]}
+          activeMetric={selectedMetric}
+          priority={focus.title}
           onClose={() => setSelectedMetric(null)}
         />
       ) : null}
@@ -675,26 +677,7 @@ function formatDate(value: string | null | undefined) {
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: theme.colors.background },
   scrollContent: { paddingBottom: 140 },
-  container: { width: "100%", maxWidth: 1120, alignSelf: "center", paddingHorizontal: 24 },
-  header: {
-    height: 82,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  logo: { color: theme.colors.text, fontSize: 18, fontWeight: "800", letterSpacing: 4 },
-  avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: theme.colors.glass,
-    borderWidth: 1,
-    borderColor: theme.colors.glassBorder,
-    alignItems: "center",
-    justifyContent: "center",
-    boxShadow: theme.shadows.soft,
-  },
-  avatarText: { color: theme.colors.text, fontWeight: "700" },
+  container: { width: "100%", maxWidth: theme.layout.contentMaxWidth, alignSelf: "center", paddingHorizontal: theme.layout.pagePadding },
   hero: { paddingTop: 42, paddingBottom: 38, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 28 },
   heroCompact: { alignItems: "flex-start", flexWrap: "wrap" },
   heroCopy: { flex: 1, maxWidth: 720 },

@@ -2305,7 +2305,7 @@ const styles = StyleSheet.create({
 
   contentContainer: {
     width: "100%",
-    maxWidth: 1120,
+    maxWidth: theme.layout.contentMaxWidth,
     alignSelf: "center",
     paddingHorizontal: 32,
   },

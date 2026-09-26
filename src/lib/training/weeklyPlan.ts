@@ -29,9 +29,6 @@ export type WorkoutAssignmentsByDate = Readonly<
   Record<string, WorkoutAssignment | undefined>
 >;
 
-// This shared source will be replaced by persisted workout assignments later.
-export const CURRENT_WORKOUT_ASSIGNMENTS: WorkoutAssignmentsByDate = {};
-
 export const REST_DAY_WORKOUT: WorkoutAssignment = {
   id: "rest-day",
   title: "Rest Day",

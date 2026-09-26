@@ -800,8 +800,8 @@ const styles = StyleSheet.create({
 
   container: {
     width: "100%",
-    maxWidth: 1120,
-    paddingHorizontal: 24,
+    maxWidth: theme.layout.contentMaxWidth,
+    paddingHorizontal: theme.layout.pagePadding,
   },
 
   containerLarge: {

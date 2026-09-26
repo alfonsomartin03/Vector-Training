@@ -119,7 +119,7 @@ export function InformationReference({ children }: { children: ReactNode }) {
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: theme.colors.background },
   content: { alignItems: "center", paddingBottom: 90 },
-  container: { width: "100%", maxWidth: 1120, paddingHorizontal: 24 },
+  container: { width: "100%", maxWidth: theme.layout.contentMaxWidth, paddingHorizontal: theme.layout.pagePadding },
   hero: { maxWidth: 850, paddingTop: 74, paddingBottom: 48 },
   heroCompact: { paddingTop: 48, paddingBottom: 36 },
   eyebrow: {

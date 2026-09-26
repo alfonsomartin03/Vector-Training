@@ -211,7 +211,7 @@ function Action({ label, onPress, disabled = false, primary = false }: { label: 
 
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: theme.colors.background },
-  container: { width: "100%", maxWidth: 1120, alignSelf: "center", padding: 24, paddingBottom: 80, gap: 24 },
+  container: { width: "100%", maxWidth: theme.layout.contentMaxWidth, alignSelf: "center", padding: theme.layout.pagePadding, paddingBottom: 80, gap: 24 },
   heading: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 18, paddingVertical: 24 },
   title: { fontSize: 36, fontWeight: "700", color: theme.colors.text, marginVertical: 12 },
   eyebrow: { fontSize: 11, letterSpacing: 1.4, fontWeight: "700", color: theme.colors.textSecondary },

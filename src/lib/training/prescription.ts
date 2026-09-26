@@ -72,9 +72,9 @@ export function weekKey(date: Date = new Date()) {
 export function validateAvailability(value: Availability): string | null {
   const date = new Date(`${value.week_start}T12:00:00`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value.week_start) || !Number.isFinite(date.getTime()) || weekKey(date) !== value.week_start) return "Choose a Monday-starting calendar week.";
-  if (![value.weekly_minutes, value.recent_weekly_minutes].every(n => Number.isInteger(n) && n >= 0 && n <= 1800)) return "Weekly hours must be between 0 and 30, in whole minutes.";
-  if (!Number.isInteger(value.max_session_minutes) || value.max_session_minutes < 30 || value.max_session_minutes > 360) return "Maximum ride length must be 30–360 minutes.";
-  if (!Array.isArray(value.rest_days) || new Set(value.rest_days).size !== value.rest_days.length || !value.rest_days.every(n => Number.isInteger(n) && n >= 0 && n <= 6)) return "Choose valid, distinct rest days.";
+  if (![value.weekly_minutes, value.recent_weekly_minutes].every(n => Number.isInteger(n) && n >= 180 && n <= 2100)) return "Weekly training time must be between 3 and 35 hours.";
+  if (!Number.isInteger(value.max_session_minutes) || value.max_session_minutes < 60 || value.max_session_minutes > 350) return "Maximum ride length must be 60–350 minutes.";
+  if (!Array.isArray(value.rest_days) || value.rest_days.length > 6 || new Set(value.rest_days).size !== value.rest_days.length || !value.rest_days.every(n => Number.isInteger(n) && n >= 0 && n <= 6)) return "Choose distinct rest days and leave at least one day available for training.";
   if (typeof value.recovery_week !== "boolean") return "Choose a recovery preference.";
   return null;
 }

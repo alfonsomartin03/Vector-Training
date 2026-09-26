@@ -106,19 +106,10 @@ export default function RegisterScreen() {
     initialRegistrationData
   );
 
-  /*
-   * Once Step 1 succeeds, this contains the Supabase Auth user ID.
-   *
-   * We keep it so Steps 2 and 3 don't need to call signUp again.
-   */
+  // Set only after the completed form is submitted. Retaining the ID makes a
+  // database-write failure retryable without creating a second Auth account.
   const [createdUserId, setCreatedUserId] =
     useState<string | null>(null);
-
-  /*
-   * Separate state for Step 1 account creation.
-   */
-  const [isCreatingAccount, setIsCreatingAccount] =
-    useState(false);
 
   const [accountError, setAccountError] =
     useState<string | null>(null);
@@ -233,20 +224,11 @@ export default function RegisterScreen() {
   };
 
   /* ------------------------------------------------------------------------ */
-  /*                         Step 1 — Create Account                          */
+  /*                         Step 1 — Account Details                         */
   /* ------------------------------------------------------------------------ */
 
-  const handleAccountStep = async () => {
-    if (!accountValid || isCreatingAccount) {
-      return;
-    }
-
-    /*
-     * If Supabase already created the Auth user and the person simply went
-     * backwards in onboarding, don't create another account.
-     */
-    if (createdUserId) {
-      animateToStep(1);
+  const handleAccountStep = () => {
+    if (!accountValid) {
       return;
     }
 
@@ -257,67 +239,8 @@ export default function RegisterScreen() {
       return;
     }
 
-    setIsCreatingAccount(true);
     setAccountError(null);
-
-    try {
-      const email =
-        data.account.email.trim().toLowerCase();
-
-      const {
-        data: authData,
-        error: authError,
-      } = await supabase.auth.signUp({
-        email,
-        password: data.account.password,
-      });
-
-      if (authError) {
-        console.error("Account sign-up request failed.");
-
-        const message =
-          authError.message.toLowerCase();
-
-        if (
-          message.includes("already") ||
-          message.includes("registered") ||
-          message.includes("exists")
-        ) {
-          setAccountError("We couldn't create this account. Check your details or try signing in.");
-        } else {
-          setAccountError("We couldn't create this account. Please try again.");
-        }
-
-        return;
-      }
-
-      if (!authData.user) {
-        setAccountError(
-          "We couldn't create your account. Please try again."
-        );
-
-        return;
-      }
-
-      /*
-       * Store the Auth UUID so the remaining onboarding data can be attached
-       * to this exact user.
-       */
-      setCreatedUserId(authData.user.id);
-
-      animateToStep(1);
-    } catch (error) {
-      console.error(
-        "Account creation error:",
-        error
-      );
-
-      setAccountError(
-        "Something went wrong while creating your account. Please try again."
-      );
-    } finally {
-      setIsCreatingAccount(false);
-    }
+    animateToStep(1);
   };
 
   /* ------------------------------------------------------------------------ */
@@ -329,15 +252,7 @@ export default function RegisterScreen() {
       return;
     }
 
-    if (!createdUserId) {
-      setSubmitError(
-        "Your account session could not be found. Please restart registration."
-      );
-
-      return;
-    }
-
-    if (!physiologicalValid || !powerValid) {
+    if (!accountValid || !physiologicalValid || !powerValid) {
       setSubmitError(
         "Please complete all required fields and enter maximal efforts that produce a valid Critical Power model."
       );
@@ -349,7 +264,33 @@ export default function RegisterScreen() {
     setSubmitError(null);
 
     try {
-      const userId = createdUserId;
+      let userId = createdUserId;
+
+      if (!userId) {
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: data.account.email.trim().toLowerCase(),
+          password: data.account.password,
+        });
+
+        if (authError) {
+          console.error("Account sign-up request failed.");
+          const message = authError.message.toLowerCase();
+          setSubmitError(
+            message.includes("already") || message.includes("registered") || message.includes("exists")
+              ? "An account may already use this email. Try signing in instead."
+              : "We couldn't create your account. Please try again."
+          );
+          return;
+        }
+
+        if (!authData.user) {
+          setSubmitError("We couldn't create your account. Please try again.");
+          return;
+        }
+
+        userId = authData.user.id;
+        setCreatedUserId(userId);
+      }
 
       /* -------------------------------------------------------------------- */
       /*                         Save Athlete Profile                          */
@@ -551,14 +492,6 @@ export default function RegisterScreen() {
                   accountError={
                     accountError
                   }
-                  isCreatingAccount={
-                    isCreatingAccount
-                  }
-                  accountCreated={
-                    Boolean(
-                      createdUserId
-                    )
-                  }
                   acceptedTerms={acceptedTerms}
                   onAcceptedTermsChange={setAcceptedTerms}
                   website={website}
@@ -734,8 +667,6 @@ function AccountStep({
   isMobile,
   onNext,
   accountError,
-  isCreatingAccount,
-  accountCreated,
   acceptedTerms,
   onAcceptedTermsChange,
   website,
@@ -761,9 +692,6 @@ function AccountStep({
 
   accountError: string | null;
 
-  isCreatingAccount: boolean;
-
-  accountCreated: boolean;
   acceptedTerms: boolean;
   onAcceptedTermsChange: (value: boolean) => void;
   website: string;
@@ -773,14 +701,6 @@ function AccountStep({
     field: keyof RegistrationData["account"],
     value: string
   ) => {
-    /*
-     * Once the actual Supabase account exists, don't let account credentials
-     * diverge from what was sent to Supabase.
-     */
-    if (accountCreated) {
-      return;
-    }
-
     setData((prev) => ({
       ...prev,
 
@@ -815,30 +735,6 @@ function AccountStep({
         Your training starts with understanding you.
       </Text>
 
-      {accountCreated && (
-        <View
-          style={
-            styles.accountCreatedBox
-          }
-        >
-          <Text
-            style={
-              styles.accountCreatedTitle
-            }
-          >
-            Account created
-          </Text>
-
-          <Text
-            style={
-              styles.accountCreatedText
-            }
-          >
-            Your login has already been secured. Continue to finish setting up your athlete profile.
-          </Text>
-        </View>
-      )}
-
       <View
         style={[
           styles.nameRow,
@@ -865,9 +761,6 @@ function AccountStep({
             placeholder="First"
             autoCapitalize="words"
             maxLength={100}
-            editable={
-              !accountCreated
-            }
           />
         </View>
 
@@ -890,9 +783,6 @@ function AccountStep({
             placeholder="Last"
             autoCapitalize="words"
             maxLength={100}
-            editable={
-              !accountCreated
-            }
           />
         </View>
       </View>
@@ -911,7 +801,6 @@ function AccountStep({
         autoCapitalize="none"
         autoCorrect={false}
         maxLength={254}
-        editable={!accountCreated}
       />
 
       {data.account.email.length >
@@ -943,12 +832,10 @@ function AccountStep({
         autoCapitalize="none"
         autoCorrect={false}
         maxLength={128}
-        editable={!accountCreated}
       />
 
       {data.account.password
-        .length > 0 &&
-        !accountCreated && (
+        .length > 0 && (
           <View
             style={
               styles.requirements
@@ -1008,14 +895,12 @@ function AccountStep({
         autoCapitalize="none"
         autoCorrect={false}
         maxLength={128}
-        editable={!accountCreated}
       />
 
       {data.account
         .confirmPassword.length >
         0 &&
-        !passwordsMatch &&
-        !accountCreated && (
+        !passwordsMatch && (
           <Text
             style={
               styles.errorText
@@ -1028,7 +913,6 @@ function AccountStep({
       <Pressable
         accessibilityRole="checkbox"
         accessibilityState={{ checked: acceptedTerms }}
-        disabled={accountCreated}
         onPress={() => onAcceptedTermsChange(!acceptedTerms)}
         style={styles.consentRow}
       >
@@ -1084,18 +968,8 @@ function AccountStep({
       )}
 
       <PrimaryButton
-        label={
-          isCreatingAccount
-            ? "Checking account..."
-            : accountCreated
-              ? "Continue"
-              : "Create account & continue"
-        }
-        disabled={
-          (!valid &&
-            !accountCreated) ||
-          isCreatingAccount
-        }
+        label="Continue"
+        disabled={!valid}
         onPress={onNext}
       />
     </>
@@ -1127,6 +1001,19 @@ function AthleteStep({
       physiological: {
         ...prev.physiological,
         [field]: value,
+      },
+    }));
+  };
+
+  const updateAvailability = (availability: Availability) => {
+    setData((previous) => ({
+      ...previous,
+      availability,
+      physiological: {
+        ...previous.physiological,
+        weeklyVolume: weeklyVolumeFromMinutes(
+          availability.weekly_minutes
+        ),
       },
     }));
   };
@@ -1309,19 +1196,8 @@ function AthleteStep({
         week={weekKey()}
         saving={false}
         onboarding
-        onDirty={() => setData(previous => ({ ...previous, availability: null }))}
-        onSave={async availability => {
-          setData(previous => ({
-            ...previous,
-            availability,
-            physiological: {
-              ...previous.physiological,
-              weeklyVolume: weeklyVolumeFromMinutes(
-                availability.recent_weekly_minutes
-              ),
-            },
-          }));
-        }}
+        onChange={updateAvailability}
+        onSave={async (availability) => updateAvailability(availability)}
       />
 
       <NavigationButtons
@@ -2453,33 +2329,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginTop: 10,
     marginBottom: 32,
-  },
-
-  accountCreatedBox: {
-    backgroundColor:
-      theme.colors.accentSoft,
-    borderWidth: 1,
-    borderColor:
-      theme.colors.accent,
-    borderRadius:
-      theme.radius.md,
-    padding: 16,
-    marginBottom: 24,
-  },
-
-  accountCreatedTitle: {
-    color:
-      theme.colors.accent,
-    fontSize: 13,
-    fontWeight: "700",
-    marginBottom: 4,
-  },
-
-  accountCreatedText: {
-    color:
-      theme.colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 19,
   },
 
   accountErrorBox: {

@@ -33,7 +33,8 @@ function completion(templateId, weeksAgo, changes = {}) {
 }
 test("availability validates dates, finite bounds, distinct rest days and boolean recovery", () => {
   assert.equal(validateAvailability(base), null);
-  for (const change of [{ weekly_minutes: NaN }, { recent_weekly_minutes: -1 }, { max_session_minutes: 361 }, { rest_days: [0, 0] }, { rest_days: [7] }, { recovery_week: "yes" }, { week_start: "2026-09-22" }, { week_start: "bad" }]) assert.ok(validateAvailability({ ...base, ...change }));
+  assert.equal(validateAvailability({ ...base, weekly_minutes: 2100, recent_weekly_minutes: 2100, max_session_minutes: 350 }), null);
+  for (const change of [{ weekly_minutes: 179 }, { weekly_minutes: 2101 }, { recent_weekly_minutes: 0 }, { max_session_minutes: 59 }, { max_session_minutes: 351 }, { rest_days: [0, 0] }, { rest_days: [0, 1, 2, 3, 4, 5, 6] }, { rest_days: [7] }, { recovery_week: "yes" }, { week_start: "2026-09-22" }, { week_start: "bad" }]) assert.ok(validateAvailability({ ...base, ...change }));
 });
 test("latest prior week carries forward; future edits never flow backwards", () => {
   const old = { ...base, week_start: "2026-09-14" }, next = { ...base, week_start: "2026-09-28", weekly_minutes: 0 };
